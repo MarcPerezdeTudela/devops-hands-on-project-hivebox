@@ -52,4 +52,72 @@ Here is a pre-start checklist:
 
 ## Implementation
 
-** ADD YOUR IMPLEMENTATION DOCUMENTATION HERE **
+### Phase 2: first runnable version
+
+The initial HiveBox release is `v0.0.1`. At this stage, the application has one
+responsibility: print its current version and exit successfully. It has no
+third-party Python dependencies.
+
+The implementation consists of:
+
+- `app.py`: defines the version and the function that prints it.
+- `Dockerfile`: packages the application in a Python container.
+- `.dockerignore`: keeps development-only files out of the Docker build context.
+
+### Prerequisites
+
+- Python 3
+- Docker Engine or Docker Desktop
+
+### Run locally
+
+From the repository root, run:
+
+```shell
+python3 app.py
+```
+
+Expected output:
+
+```text
+v0.0.1
+```
+
+To test the output automatically:
+
+```shell
+test "$(python3 app.py)" = "v0.0.1"
+```
+
+The command exits with status `0` when the output is correct.
+
+### Build and run with Docker
+
+Build the image with the application version as its tag:
+
+```shell
+docker build --tag hivebox:v0.0.1 .
+```
+
+Run the container:
+
+```shell
+docker run --rm hivebox:v0.0.1
+```
+
+Expected output:
+
+```text
+v0.0.1
+```
+
+To test the container output automatically:
+
+```shell
+test "$(docker run --rm hivebox:v0.0.1)" = "v0.0.1" \
+  && echo "Passed Test" \
+  || echo "Failed Test"
+```
+
+The container stops after printing the version. The `--rm` option removes the
+stopped container automatically.
