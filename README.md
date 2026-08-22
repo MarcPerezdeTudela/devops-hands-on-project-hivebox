@@ -143,3 +143,19 @@ stop the API. The `--rm` option removes the stopped container automatically.
 
 The application version comes from the installed package metadata generated
 from `project.version` in `pyproject.toml`.
+
+#### Run the unit tests
+
+Install the test dependencies:
+
+```shell
+python -m pip install --editable ".[test]"
+```
+
+Run the test suite:
+
+```shell
+pytest
+```
+
+The tests mock all openSenseMap requests and do not require network access.
