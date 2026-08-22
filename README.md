@@ -52,72 +52,110 @@ Here is a pre-start checklist:
 
 ## Implementation
 
-### Phase 2: first runnable version
+### Phase 3: FastAPI application setup
 
-The initial HiveBox release is `v0.0.1`. At this stage, the application has one
-responsibility: print its current version and exit successfully. It has no
-third-party Python dependencies.
+The API is implemented with FastAPI. Its application object lives in
+`src/main.py`, and `pyproject.toml` declares both the Python dependencies
+and the FastAPI entrypoint.
 
-The implementation consists of:
+Python 3.13 is required.
 
-- `app.py`: defines the version and the function that prints it.
-- `Dockerfile`: packages the application in a Python container.
-- `.dockerignore`: keeps development-only files out of the Docker build context.
-
-### Prerequisites
-
-- Python 3
-- Docker Engine or Docker Desktop
-
-### Run locally
-
-From the repository root, run:
+Create and activate a virtual environment:
 
 ```shell
-python3 app.py
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-Expected output:
-
-```text
-v0.0.1
-```
-
-To test the output automatically:
+Install the project and its dependencies:
 
 ```shell
-test "$(python3 app.py)" = "v0.0.1"
+python -m pip install --editable .
 ```
 
-The command exits with status `0` when the output is correct.
+Start the development server:
 
-### Build and run with Docker
+```shell
+fastapi dev
+```
 
-Build the image with the application version as its tag:
+The server listens on `http://127.0.0.1:8000`. FastAPI's generated API
+documentation is available at `http://127.0.0.1:8000/docs`, and its OpenAPI
+schema is available at `http://127.0.0.1:8000/openapi.json`.
+
+#### Get the deployed version
+
+Request the currently deployed application version:
+
+```shell
+curl http://127.0.0.1:8000/version
+```
+
+The parameterless `GET /version` endpoint returns:
+
+```json
+{"version":"0.0.1"}
+```
+
+#### Get the current average temperature
+
+The application retrieves the ambient temperature from the three configured
+senseBoxes and averages measurements from the last hour:
+
+- `5eba5fbad46fb8001b799786`
+- `5c21ff8f919bf8001adf2488`
+- `5ade1acf223bd80019a1011c`
+
+Request the current average temperature:
+
+```shell
+curl http://127.0.0.1:8000/temperature
+```
+
+The parameterless `GET /temperature` endpoint returns the average rounded to
+two decimal places:
+
+```json
+{"average_temperature":15.1,"unit":"°C"}
+```
+
+Only ambient temperature measurements no older than one hour are included. The
+endpoint returns `502 Bad Gateway` when openSenseMap cannot provide valid data,
+and `503 Service Unavailable` when no recent measurement is available.
+
+#### Run with Docker
+
+Build the image from the repository root:
 
 ```shell
 docker build --tag hivebox:v0.0.1 .
 ```
 
-Run the container:
+Run the API and publish its port locally:
 
 ```shell
-docker run --rm hivebox:v0.0.1
+docker run --rm --publish 8000:8000 hivebox:v0.0.1
 ```
 
-Expected output:
+The API documentation is then available at `http://127.0.0.1:8000/docs`, and
+the OpenAPI schema at `http://127.0.0.1:8000/openapi.json`. Press `Ctrl+C` to
+stop the API. The `--rm` option removes the stopped container automatically.
 
-```text
-v0.0.1
-```
+The application version comes from the installed package metadata generated
+from `project.version` in `pyproject.toml`.
 
-To test the container output automatically:
+#### Run the unit tests
+
+Install the test dependencies:
 
 ```shell
-test "$(docker run --rm hivebox:v0.0.1)" = "v0.0.1" \
-  && echo "Passed Test" \
-  || echo "Failed Test"
+python -m pip install --editable ".[test]"
 ```
 
-The container stops after printing the version. The `--rm` option removes the
-stopped container automatically.
+Run the test suite:
+
+```shell
+pytest
+```
+
+The tests mock all openSenseMap requests and do not require network access.
