@@ -52,72 +52,54 @@ Here is a pre-start checklist:
 
 ## Implementation
 
-### Phase 2: first runnable version
+### Phase 3: FastAPI application setup
 
-The initial HiveBox release is `v0.0.1`. At this stage, the application has one
-responsibility: print its current version and exit successfully. It has no
-third-party Python dependencies.
+The API is implemented with FastAPI. Its application object lives in
+`src/main.py`, and `pyproject.toml` declares both the Python dependencies
+and the FastAPI entrypoint.
 
-The implementation consists of:
+Python 3.13 is required.
 
-- `app.py`: defines the version and the function that prints it.
-- `Dockerfile`: packages the application in a Python container.
-- `.dockerignore`: keeps development-only files out of the Docker build context.
-
-### Prerequisites
-
-- Python 3
-- Docker Engine or Docker Desktop
-
-### Run locally
-
-From the repository root, run:
+Create and activate a virtual environment:
 
 ```shell
-python3 app.py
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-Expected output:
-
-```text
-v0.0.1
-```
-
-To test the output automatically:
+Install the project and its dependencies:
 
 ```shell
-test "$(python3 app.py)" = "v0.0.1"
+python -m pip install --editable .
 ```
 
-The command exits with status `0` when the output is correct.
+Start the development server:
 
-### Build and run with Docker
+```shell
+fastapi dev
+```
 
-Build the image with the application version as its tag:
+The server listens on `http://127.0.0.1:8000`. FastAPI's generated API
+documentation is available at `http://127.0.0.1:8000/docs`, and its OpenAPI
+schema is available at `http://127.0.0.1:8000/openapi.json`.
+
+#### Run with Docker
+
+Build the image from the repository root:
 
 ```shell
 docker build --tag hivebox:v0.0.1 .
 ```
 
-Run the container:
+Run the API and publish its port locally:
 
 ```shell
-docker run --rm hivebox:v0.0.1
+docker run --rm --publish 8000:8000 hivebox:v0.0.1
 ```
 
-Expected output:
+The API documentation is then available at `http://127.0.0.1:8000/docs`, and
+the OpenAPI schema at `http://127.0.0.1:8000/openapi.json`. Press `Ctrl+C` to
+stop the API. The `--rm` option removes the stopped container automatically.
 
-```text
-v0.0.1
-```
-
-To test the container output automatically:
-
-```shell
-test "$(docker run --rm hivebox:v0.0.1)" = "v0.0.1" \
-  && echo "Passed Test" \
-  || echo "Failed Test"
-```
-
-The container stops after printing the version. The `--rm` option removes the
-stopped container automatically.
+This setup does not add application endpoints yet. They are implemented in
+separate Phase 3 issues.
