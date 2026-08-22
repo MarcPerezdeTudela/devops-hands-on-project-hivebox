@@ -97,6 +97,32 @@ The parameterless `GET /version` endpoint returns:
 {"version":"0.0.1"}
 ```
 
+#### Get the current average temperature
+
+The application retrieves the ambient temperature from the three configured
+senseBoxes and averages measurements from the last hour:
+
+- `5eba5fbad46fb8001b799786`
+- `5c21ff8f919bf8001adf2488`
+- `5ade1acf223bd80019a1011c`
+
+Request the current average temperature:
+
+```shell
+curl http://127.0.0.1:8000/temperature
+```
+
+The parameterless `GET /temperature` endpoint returns the average rounded to
+two decimal places:
+
+```json
+{"average_temperature":15.1,"unit":"°C"}
+```
+
+Only ambient temperature measurements no older than one hour are included. The
+endpoint returns `502 Bad Gateway` when openSenseMap cannot provide valid data,
+and `503 Service Unavailable` when no recent measurement is available.
+
 #### Run with Docker
 
 Build the image from the repository root:
