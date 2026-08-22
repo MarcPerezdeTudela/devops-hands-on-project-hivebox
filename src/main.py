@@ -1,5 +1,21 @@
 """FastAPI application setup."""
 
 from fastapi import FastAPI
+from pydantic import BaseModel
 
-app = FastAPI(title="HiveBox", version="0.0.1")
+from src import __version__
+
+
+class VersionResponse(BaseModel):
+    """Currently deployed HiveBox version."""
+
+    version: str
+
+
+app = FastAPI(title="HiveBox", version=__version__)
+
+
+@app.get("/version", response_model=VersionResponse)
+def get_version() -> VersionResponse:
+    """Return the currently deployed application version."""
+    return VersionResponse(version=__version__)

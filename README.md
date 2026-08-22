@@ -83,6 +83,20 @@ The server listens on `http://127.0.0.1:8000`. FastAPI's generated API
 documentation is available at `http://127.0.0.1:8000/docs`, and its OpenAPI
 schema is available at `http://127.0.0.1:8000/openapi.json`.
 
+#### Get the deployed version
+
+Request the currently deployed application version:
+
+```shell
+curl http://127.0.0.1:8000/version
+```
+
+The parameterless `GET /version` endpoint returns:
+
+```json
+{"version":"0.0.1"}
+```
+
 #### Run with Docker
 
 Build the image from the repository root:
@@ -101,5 +115,5 @@ The API documentation is then available at `http://127.0.0.1:8000/docs`, and
 the OpenAPI schema at `http://127.0.0.1:8000/openapi.json`. Press `Ctrl+C` to
 stop the API. The `--rm` option removes the stopped container automatically.
 
-This setup does not add application endpoints yet. They are implemented in
-separate Phase 3 issues.
+The application version comes from the installed package metadata generated
+from `project.version` in `pyproject.toml`.
