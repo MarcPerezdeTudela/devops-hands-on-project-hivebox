@@ -37,7 +37,9 @@ Here is a pre-start checklist:
 
 - [Create GitHub account](https://docs.github.com/en/get-started/start-your-journey/creating-an-account-on-github) (if you don't have one), then [fork this repository](https://github.com/DevOpsHiveHQ/devops-hands-on-project-hivebox/fork) and start from there.
 - [Create GitHub project board](https://docs.github.com/en/issues/planning-and-tracking-with-projects/creating-projects/creating-a-project) for this repository (use `Kanban` template).
-- Each phase should be presented as a pull request against the `main` branch. Don’t push directly to the main branch!
+- Feature and bugfix branches target `develop`. Only `release/*` and
+  `hotfix/*` branches target `main`, following Gitflow. Don't push directly to
+  either protected branch.
 - Document as you go. Always assume that someone else will read your project at any phase.
 - You can get senseBox IDs by checking the [openSenseMap](https://opensensemap.org/) website. Use 3 senseBox IDs close to each other (you can use the following [5eba5fbad46fb8001b799786](https://opensensemap.org/explore/5eba5fbad46fb8001b799786), [5c21ff8f919bf8001adf2488](https://opensensemap.org/explore/5c21ff8f919bf8001adf2488), and [5ade1acf223bd80019a1011c](https://opensensemap.org/explore/5ade1acf223bd80019a1011c)). Just copy the IDs, you will need them in the next steps.
 
@@ -52,72 +54,191 @@ Here is a pre-start checklist:
 
 ## Implementation
 
-### Phase 2: first runnable version
+### Phase 3: FastAPI application setup
 
-The initial HiveBox release is `v0.0.1`. At this stage, the application has one
-responsibility: print its current version and exit successfully. It has no
-third-party Python dependencies.
+The API is implemented with FastAPI. Its application object lives in
+`src/main.py`, and `pyproject.toml` declares both the Python dependencies
+and the FastAPI entrypoint.
 
-The implementation consists of:
+Python 3.13 is required.
 
-- `app.py`: defines the version and the function that prints it.
-- `Dockerfile`: packages the application in a Python container.
-- `.dockerignore`: keeps development-only files out of the Docker build context.
-
-### Prerequisites
-
-- Python 3
-- Docker Engine or Docker Desktop
-
-### Run locally
-
-From the repository root, run:
+Create and activate a virtual environment:
 
 ```shell
-python3 app.py
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
-Expected output:
+Install the project and its dependencies:
+
+```shell
+python -m pip install --editable .
+```
+
+Start the development server:
+
+```shell
+fastapi dev
+```
+
+The server listens on `http://127.0.0.1:8000`. FastAPI's generated API
+documentation is available at `http://127.0.0.1:8000/docs`, and its OpenAPI
+schema is available at `http://127.0.0.1:8000/openapi.json`.
+
+#### Get the deployed version
+
+Request the currently deployed application version:
+
+```shell
+curl http://127.0.0.1:8000/version
+```
+
+The parameterless `GET /version` endpoint returns:
+
+```json
+{"version":"0.1.0"}
+```
+
+#### Get the current average temperature
+
+The application retrieves the ambient temperature from the three configured
+senseBoxes and averages measurements from the last hour:
+
+- `5eba5fbad46fb8001b799786`
+- `5c21ff8f919bf8001adf2488`
+- `5ade1acf223bd80019a1011c`
+
+Request the current average temperature:
+
+```shell
+curl http://127.0.0.1:8000/temperature
+```
+
+The parameterless `GET /temperature` endpoint returns the average rounded to
+two decimal places:
+
+```json
+{"average_temperature":15.1,"unit":"°C"}
+```
+
+Only ambient temperature measurements no older than one hour are included. The
+endpoint returns `502 Bad Gateway` when openSenseMap cannot provide valid data,
+and `503 Service Unavailable` when no recent measurement is available.
+
+#### Run with Docker
+
+The multi-stage build installs the application in an isolated virtual
+environment and copies only that environment into the runtime stage. The final
+container uses the pinned slim Python image and runs as the unprivileged user
+`10001:10001`.
+
+Validate the Dockerfile and build the image from the repository root:
+
+```shell
+docker build --check .
+docker build --tag hivebox:v0.1.0 .
+```
+
+Run the API and publish its port locally:
+
+```shell
+docker run --rm --publish 8000:8000 hivebox:v0.1.0
+```
+
+You can verify that the configured process is not running as root:
+
+```shell
+docker run --rm --entrypoint id hivebox:v0.1.0
+```
+
+The API documentation is then available at `http://127.0.0.1:8000/docs`, and
+the OpenAPI schema at `http://127.0.0.1:8000/openapi.json`. Press `Ctrl+C` to
+stop the API. The `--rm` option removes the stopped container automatically.
+
+The application version comes from the installed package metadata generated
+from `project.version` in `pyproject.toml`.
+
+#### Run the unit tests
+
+Install the test dependencies:
+
+```shell
+python -m pip install --editable ".[test]"
+```
+
+Run the test suite:
+
+```shell
+pytest
+```
+
+The tests mock all openSenseMap requests and do not require network access.
+
+#### Run the quality checks
+
+Install the quality and test dependencies:
+
+```shell
+python -m pip install --editable ".[quality,test]"
+```
+
+Run the Python quality gates locally:
+
+```shell
+python -m pylint src tests
+ruff format --check src tests
+python -m mypy
+python -m build
+python -m twine check dist/*
+python -m pip check
+python -m pytest --cov=src --cov-report=term-missing
+```
+
+The test suite must maintain at least 90% coverage. Pylint, Ruff, mypy and the
+packaging tools are configured in `pyproject.toml`.
+
+#### Continuous integration
+
+The GitHub Actions workflow runs for pull requests and subsequent pushes to
+`develop` and `main`. Its independent checks enforce:
+
+- Gitflow branch direction and Conventional Commits pull request titles
+- GitHub Actions syntax
+- Python linting, formatting, strict static typing and package integrity
+- unit tests and the coverage threshold
+- Dockerfile linting, image building, non-root metadata and a live `/version`
+  smoke test with graceful shutdown
+
+Configure the repository rulesets for `develop` and `main` to require the
+following status checks before merging:
 
 ```text
-v0.0.1
+pull-request-policy
+workflow-lint
+python-quality
+unit-tests
+container
 ```
 
-To test the output automatically:
+The workflow has read-only repository permissions. External GitHub Actions and
+containerized linters are pinned to immutable commits or image digests.
 
-```shell
-test "$(python3 app.py)" = "v0.0.1"
-```
+#### Supply-chain security analysis
 
-The command exits with status `0` when the output is correct.
+OpenSSF Scorecard evaluates the repository's software supply-chain security
+practices. It checks repository configuration and development practices such as
+workflow permissions, pinned dependencies, branch protection, security policy,
+code review and vulnerability handling. It complements the application checks
+in continuous integration; it does not replace tests, linters or vulnerability
+scanners.
 
-### Build and run with Docker
+The Scorecard workflow runs after pushes to `main` and every Saturday at
+01:30 UTC. Feature branches target `develop`, so their pull requests do not run
+this repository-level analysis. The first canonical result for a change appears
+after a release branch is merged into `main`.
 
-Build the image with the application version as its tag:
-
-```shell
-docker build --tag hivebox:v0.0.1 .
-```
-
-Run the container:
-
-```shell
-docker run --rm hivebox:v0.0.1
-```
-
-Expected output:
-
-```text
-v0.0.1
-```
-
-To test the container output automatically:
-
-```shell
-test "$(docker run --rm hivebox:v0.0.1)" = "v0.0.1" \
-  && echo "Passed Test" \
-  || echo "Failed Test"
-```
-
-The container stops after printing the version. The `--rm` option removes the
-stopped container automatically.
+Each run publishes its SARIF results to GitHub Code Scanning and to the public
+OpenSSF Scorecard service. The same SARIF file is available as a workflow
+artifact for five days. Consult the workflow run in the repository's Actions
+tab, its findings under **Security > Code scanning**, or the public
+[OpenSSF Scorecard viewer](https://scorecard.dev/viewer/?uri=github.com/MarcPerezdeTudela/devops-hands-on-project-hivebox).
