@@ -91,10 +91,7 @@ async def get_average_temperature(
 
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS) as client:
         measurements = await asyncio.gather(
-            *(
-                _fetch_temperature(client, box_id, cutoff)
-                for box_id in box_ids
-            )
+            *(_fetch_temperature(client, box_id, cutoff) for box_id in box_ids)
         )
 
     fresh_measurements = [
