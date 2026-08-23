@@ -103,7 +103,7 @@ jobs:
           cache-dependency-path: pyproject.toml
 
       - name: Install the application and quality tools
-        run: python -m pip install --disable-pip-version-check ".[quality]"
+        run: python -m pip install --disable-pip-version-check ".[quality,test]"
 
       - name: Run Pylint
         run: python -m pylint src tests
