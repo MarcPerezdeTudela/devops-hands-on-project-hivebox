@@ -16,7 +16,15 @@ dependencies = [
 [project.optional-dependencies]
 test = [
     "pytest==9.1.1",
+    "pytest-cov==7.1.0",
     "pytest-httpx==0.36.2",
+]
+quality = [
+    "build==1.5.0",
+    "mypy==2.3.1",
+    "pylint==4.0.7",
+    "ruff==0.16.4",
+    "twine==7.0.0",
 ]
 
 [tool.fastapi]
@@ -28,3 +36,24 @@ include = ["src*"]
 [tool.pytest.ini_options]
 addopts = ["--strict-config", "--strict-markers"]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+
+[tool.mypy]
+files = ["src", "tests"]
+python_version = "3.13"
+strict = true
+
+[tool.pylint.main]
+persistent = false
+py-version = "3.13"
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
