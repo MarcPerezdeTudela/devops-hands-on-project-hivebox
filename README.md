@@ -125,9 +125,15 @@ and `503 Service Unavailable` when no recent measurement is available.
 
 #### Run with Docker
 
-Build the image from the repository root:
+The multi-stage build installs the application in an isolated virtual
+environment and copies only that environment into the runtime stage. The final
+container uses the pinned slim Python image and runs as the unprivileged user
+`10001:10001`.
+
+Validate the Dockerfile and build the image from the repository root:
 
 ```shell
+docker build --check .
 docker build --tag hivebox:v0.0.1 .
 ```
 
@@ -135,6 +141,12 @@ Run the API and publish its port locally:
 
 ```shell
 docker run --rm --publish 8000:8000 hivebox:v0.0.1
+```
+
+You can verify that the configured process is not running as root:
+
+```shell
+docker run --rm --entrypoint id hivebox:v0.0.1
 ```
 
 The API documentation is then available at `http://127.0.0.1:8000/docs`, and
