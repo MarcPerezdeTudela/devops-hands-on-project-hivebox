@@ -222,3 +222,23 @@ container
 
 The workflow has read-only repository permissions. External GitHub Actions and
 containerized linters are pinned to immutable commits or image digests.
+
+#### Supply-chain security analysis
+
+OpenSSF Scorecard evaluates the repository's software supply-chain security
+practices. It checks repository configuration and development practices such as
+workflow permissions, pinned dependencies, branch protection, security policy,
+code review and vulnerability handling. It complements the application checks
+in continuous integration; it does not replace tests, linters or vulnerability
+scanners.
+
+The Scorecard workflow runs after pushes to `main` and every Saturday at
+01:30 UTC. Feature branches target `develop`, so their pull requests do not run
+this repository-level analysis. The first canonical result for a change appears
+after a release branch is merged into `main`.
+
+Each run publishes its SARIF results to GitHub Code Scanning and to the public
+OpenSSF Scorecard service. The same SARIF file is available as a workflow
+artifact for five days. Consult the workflow run in the repository's Actions
+tab, its findings under **Security > Code scanning**, or the public
+[OpenSSF Scorecard viewer](https://scorecard.dev/viewer/?uri=github.com/MarcPerezdeTudela/devops-hands-on-project-hivebox).
