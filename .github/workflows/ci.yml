@@ -1,0 +1,277 @@
+name: Continuous integration
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pull-request-policy:
+    name: pull-request-policy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Validate Gitflow branch direction
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "${BASE_REF}:${HEAD_REF}" in
+            develop:feature/* | develop:bugfix/* | develop:release/* | develop:hotfix/*)
+              ;;
+            main:release/* | main:hotfix/*)
+              ;;
+            *)
+              echo "::error::Gitflow does not allow ${HEAD_REF} to target ${BASE_REF}."
+              exit 1
+              ;;
+          esac
+
+      - name: Validate Conventional Commits pull request title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import sys
+
+          title = os.environ["PR_TITLE"]
+          pattern = re.compile(
+              r"(?:feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)"
+              r"(?:\([a-z0-9][a-z0-9._/-]*\))?!?: \S(?:.*\S)?"
+          )
+
+          if pattern.fullmatch(title) is None:
+              print(
+                  "::error::Pull request title must match "
+                  "'type(scope)!: subject' without surrounding whitespace."
+              )
+              sys.exit(1)
+          PY
+
+  workflow-lint:
+    name: workflow-lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint GitHub Actions workflows
+        run: >-
+          docker run --rm
+          --volume "${PWD}:/repo:ro"
+          --workdir /repo
+          rhysd/actionlint@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+          -color
+
+  python-quality:
+    name: python-quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install the application and quality tools
+        run: python -m pip install --disable-pip-version-check ".[quality]"
+
+      - name: Run Pylint
+        run: python -m pylint src tests
+
+      - name: Check formatting
+        run: ruff format --check src tests
+
+      - name: Check static types
+        run: python -m mypy
+
+      - name: Build the Python distributions
+        run: python -m build
+
+      - name: Validate distribution metadata
+        run: python -m twine check dist/*
+
+      - name: Validate the wheel in an isolated environment
+        run: |
+          python -m venv "${RUNNER_TEMP}/hivebox-wheel-check"
+          "${RUNNER_TEMP}/hivebox-wheel-check/bin/python" -m pip install \
+            --disable-pip-version-check dist/*.whl
+          "${RUNNER_TEMP}/hivebox-wheel-check/bin/python" -m pip check
+          "${RUNNER_TEMP}/hivebox-wheel-check/bin/python" -c \
+            "from src.main import app; assert app.title == 'HiveBox'"
+
+  unit-tests:
+    name: unit-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install the application and test tools
+        run: python -m pip install --disable-pip-version-check ".[test]"
+
+      - name: Run unit tests with coverage
+        run: python -m pytest --cov=src --cov-report=term-missing
+
+  container:
+    name: container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CONTAINER_NAME: hivebox-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      IMAGE_NAME: hivebox:ci
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+
+      - name: Lint the Dockerfile
+        run: >-
+          docker run --rm --interactive
+          hadolint/hadolint@sha256:9a3944b7fddcb947d1ffd90829ac1a6e5c30479223358f249d8b96c7d0019e27
+          < Dockerfile
+
+      - name: Validate the Dockerfile with BuildKit
+        run: docker build --check .
+
+      - name: Build the container image
+        run: docker build --tag "${IMAGE_NAME}" .
+
+      - name: Validate container metadata
+        run: |
+          configured_user=$(docker image inspect "${IMAGE_NAME}" --format '{{.Config.User}}')
+          if [[ "${configured_user}" != "10001:10001" ]]; then
+            echo "::error::Expected image user 10001:10001, got '${configured_user}'."
+            exit 1
+          fi
+
+          docker image inspect "${IMAGE_NAME}" \
+            --format '{{json .Config.ExposedPorts}}' \
+            | python -c \
+              'import json, sys; assert "8000/tcp" in json.load(sys.stdin)'
+
+      - name: Read the expected application version
+        id: project
+        run: |
+          version=$(python -c \
+            'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Start the container
+        id: start_container
+        run: |
+          docker run --detach \
+            --name "${CONTAINER_NAME}" \
+            --publish 127.0.0.1::8000 \
+            "${IMAGE_NAME}"
+          host_port=$(docker port "${CONTAINER_NAME}" 8000/tcp | awk -F: 'NR == 1 {print $NF}')
+          if [[ -z "${host_port}" ]]; then
+            echo "::error::Docker did not publish container port 8000."
+            exit 1
+          fi
+          echo "host_port=${host_port}" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate the version endpoint
+        env:
+          EXPECTED_VERSION: ${{ steps.project.outputs.version }}
+          HOST_PORT: ${{ steps.start_container.outputs.host_port }}
+        run: |
+          response=""
+          for ((attempt = 1; attempt <= 20; attempt++)); do
+            if response=$(curl --fail --silent --show-error \
+              "http://127.0.0.1:${HOST_PORT}/version"); then
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ -z "${response}" ]]; then
+            echo "::error::The /version endpoint did not become ready within 20 seconds."
+            exit 1
+          fi
+
+          RESPONSE_BODY="${response}" python - <<'PY'
+          import json
+          import os
+          import sys
+
+          expected = {"version": os.environ["EXPECTED_VERSION"]}
+          actual = json.loads(os.environ["RESPONSE_BODY"])
+          if actual != expected:
+              print(f"::error::Expected {expected!r}, got {actual!r}.")
+              sys.exit(1)
+          PY
+
+      - name: Stop the container and verify graceful shutdown
+        if: always()
+        run: |
+          if ! docker container inspect "${CONTAINER_NAME}" > /dev/null 2>&1; then
+            exit 0
+          fi
+          if [[ "$(docker inspect "${CONTAINER_NAME}" --format '{{.State.Running}}')" == "true" ]]; then
+            docker stop --timeout 10 "${CONTAINER_NAME}"
+          fi
+          exit_code=$(docker inspect "${CONTAINER_NAME}" --format '{{.State.ExitCode}}')
+          if [[ "${exit_code}" != "0" ]]; then
+            echo "::error::Container exited with code ${exit_code}."
+            exit 1
+          fi
+
+      - name: Show container logs
+        if: always()
+        run: |
+          if docker container inspect "${CONTAINER_NAME}" > /dev/null 2>&1; then
+            docker logs "${CONTAINER_NAME}"
+          fi
+
+      - name: Remove the container
+        if: always()
+        run: |
+          if docker container inspect "${CONTAINER_NAME}" > /dev/null 2>&1; then
+            docker rm --force "${CONTAINER_NAME}"
+          fi
