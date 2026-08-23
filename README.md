@@ -37,7 +37,9 @@ Here is a pre-start checklist:
 
 - [Create GitHub account](https://docs.github.com/en/get-started/start-your-journey/creating-an-account-on-github) (if you don't have one), then [fork this repository](https://github.com/DevOpsHiveHQ/devops-hands-on-project-hivebox/fork) and start from there.
 - [Create GitHub project board](https://docs.github.com/en/issues/planning-and-tracking-with-projects/creating-projects/creating-a-project) for this repository (use `Kanban` template).
-- Each phase should be presented as a pull request against the `main` branch. Don’t push directly to the main branch!
+- Feature and bugfix branches target `develop`. Only `release/*` and
+  `hotfix/*` branches target `main`, following Gitflow. Don't push directly to
+  either protected branch.
 - Document as you go. Always assume that someone else will read your project at any phase.
 - You can get senseBox IDs by checking the [openSenseMap](https://opensensemap.org/) website. Use 3 senseBox IDs close to each other (you can use the following [5eba5fbad46fb8001b799786](https://opensensemap.org/explore/5eba5fbad46fb8001b799786), [5c21ff8f919bf8001adf2488](https://opensensemap.org/explore/5c21ff8f919bf8001adf2488), and [5ade1acf223bd80019a1011c](https://opensensemap.org/explore/5ade1acf223bd80019a1011c)). Just copy the IDs, you will need them in the next steps.
 
@@ -171,3 +173,52 @@ pytest
 ```
 
 The tests mock all openSenseMap requests and do not require network access.
+
+#### Run the quality checks
+
+Install the quality and test dependencies:
+
+```shell
+python -m pip install --editable ".[quality,test]"
+```
+
+Run the Python quality gates locally:
+
+```shell
+python -m pylint src tests
+ruff format --check src tests
+python -m mypy
+python -m build
+python -m twine check dist/*
+python -m pip check
+python -m pytest --cov=src --cov-report=term-missing
+```
+
+The test suite must maintain at least 90% coverage. Pylint, Ruff, mypy and the
+packaging tools are configured in `pyproject.toml`.
+
+#### Continuous integration
+
+The GitHub Actions workflow runs for pull requests and subsequent pushes to
+`develop` and `main`. Its independent checks enforce:
+
+- Gitflow branch direction and Conventional Commits pull request titles
+- GitHub Actions syntax
+- Python linting, formatting, strict static typing and package integrity
+- unit tests and the coverage threshold
+- Dockerfile linting, image building, non-root metadata and a live `/version`
+  smoke test with graceful shutdown
+
+Configure the repository rulesets for `develop` and `main` to require the
+following status checks before merging:
+
+```text
+pull-request-policy
+workflow-lint
+python-quality
+unit-tests
+container
+```
+
+The workflow has read-only repository permissions. External GitHub Actions and
+containerized linters are pinned to immutable commits or image digests.
