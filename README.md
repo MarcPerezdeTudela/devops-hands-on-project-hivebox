@@ -101,7 +101,7 @@ The parameterless `GET /version` endpoint returns:
 
 #### Get the current average temperature
 
-The application retrieves the ambient temperature from the three configured
+By default, the application retrieves the ambient temperature from these three
 senseBoxes and averages measurements from the last hour:
 
 - `5eba5fbad46fb8001b799786`
@@ -125,6 +125,40 @@ Only ambient temperature measurements no older than one hour are included. The
 endpoint returns `502 Bad Gateway` when openSenseMap cannot provide valid data,
 and `503 Service Unavailable` when no recent measurement is available.
 
+##### Configure the senseBoxes
+
+Set `HIVEBOX_SENSEBOX_IDS` to a comma-separated list to replace the local
+defaults. For example, start the development server with two senseBoxes:
+
+```shell
+HIVEBOX_SENSEBOX_IDS="5eba5fbad46fb8001b799786,5c21ff8f919bf8001adf2488" fastapi dev
+```
+
+For repeated local use, copy the tracked example to an ignored `.env` file and
+edit the IDs:
+
+```shell
+cp .env.example .env
+```
+
+Uvicorn can load that file before importing HiveBox:
+
+```shell
+uvicorn src.main:app --reload --env-file .env
+```
+
+`fastapi dev` uses variables already exported by the shell; use the Uvicorn
+command above when configuration should come directly from a `.env` file. Do
+not commit `.env`. The tracked `.env.example` contains only public sample
+configuration.
+
+Each senseBox ID must contain exactly 24 hexadecimal characters. Surrounding
+spaces are removed, while empty entries and duplicate IDs are rejected. An
+absent variable selects the three defaults above; a variable that is present
+but empty or malformed stops the application at startup with a configuration
+error. This distinction prevents a deployment mistake from silently querying
+the development senseBoxes.
+
 #### Run with Docker
 
 The multi-stage build installs the application in an isolated virtual
@@ -144,6 +178,26 @@ Run the API and publish its port locally:
 ```shell
 docker run --rm --publish 8000:8000 hivebox:v0.1.0
 ```
+
+Pass a custom senseBox configuration to the container at runtime:
+
+```shell
+docker run --rm \
+  --env HIVEBOX_SENSEBOX_IDS="5eba5fbad46fb8001b799786,5c21ff8f919bf8001adf2488" \
+  --publish 8000:8000 \
+  hivebox:v0.1.0
+```
+
+The equivalent environment entry in a future Kubernetes workload manifest is:
+
+```yaml
+env:
+  - name: HIVEBOX_SENSEBOX_IDS
+    value: "5eba5fbad46fb8001b799786,5c21ff8f919bf8001adf2488"
+```
+
+This example only shows the application configuration contract. Kubernetes
+manifests are introduced separately during Phase 4.
 
 You can verify that the configured process is not running as root:
 
