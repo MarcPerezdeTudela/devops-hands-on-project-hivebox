@@ -115,11 +115,20 @@ curl http://127.0.0.1:8000/temperature
 ```
 
 The parameterless `GET /temperature` endpoint returns the average rounded to
-two decimal places:
+two decimal places and its temperature status:
 
 ```json
-{"average_temperature":15.1,"unit":"°C"}
+{"average_temperature":15.1,"unit":"°C","status":"Good"}
 ```
+
+The status uses continuous boundaries, so every temperature has exactly one
+classification:
+
+| Average temperature | Status |
+| --- | --- |
+| Below 10 °C | `Too Cold` |
+| From 10 °C through 37 °C | `Good` |
+| Above 37 °C | `Too Hot` |
 
 Only ambient temperature measurements no older than one hour are included. The
 endpoint returns `502 Bad Gateway` when openSenseMap cannot provide valid data,
