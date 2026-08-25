@@ -90,6 +90,7 @@ async def test_get_average_temperature(
     assert response.json() == {
         "average_temperature": 20.0,
         "unit": "°C",
+        "status": "Good",
     }
 
 
