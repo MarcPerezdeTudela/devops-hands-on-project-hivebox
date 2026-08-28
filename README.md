@@ -168,6 +168,30 @@ but empty or malformed stops the application at startup with a configuration
 error. This distinction prevents a deployment mistake from silently querying
 the development senseBoxes.
 
+#### Inspect the default Prometheus metrics
+
+Request the application's default Prometheus metrics:
+
+```shell
+curl http://127.0.0.1:8000/metrics
+```
+
+The parameterless `GET /metrics` endpoint returns the Prometheus text
+exposition format. Representative metric families include:
+
+- `http_requests_total`, request and response sizes, and request durations;
+- `python_info` and `python_gc_*` runtime metrics;
+- `process_*` CPU, memory, and start-time metrics on supported Linux runtimes.
+
+The Docker image runs on Linux and exposes all three groups. Runtime-dependent
+process metrics may not be available when the application runs directly on a
+different operating system.
+
+`/metrics` is an operational endpoint, so it is intentionally omitted from
+FastAPI's generated documentation and OpenAPI schema. Phase 4 exposes only the
+default metrics; HiveBox-specific business metrics are introduced separately
+in Phase 5.
+
 #### Run with Docker
 
 The multi-stage build installs the application in an isolated virtual

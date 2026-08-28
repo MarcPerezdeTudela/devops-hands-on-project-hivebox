@@ -3,6 +3,7 @@
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, status
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
 from src import __version__
@@ -30,6 +31,7 @@ class TemperatureResponse(BaseModel):
 
 
 app = FastAPI(title="HiveBox", version=__version__)
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
 
 @app.get("/version", response_model=VersionResponse)
