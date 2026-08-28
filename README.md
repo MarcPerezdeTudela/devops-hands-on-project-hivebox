@@ -245,7 +245,7 @@ stop the API. The `--rm` option removes the stopped container automatically.
 The application version comes from the installed package metadata generated
 from `project.version` in `pyproject.toml`.
 
-#### Run the unit tests
+#### Run the automated tests
 
 Install the test dependencies:
 
@@ -253,13 +253,24 @@ Install the test dependencies:
 python -m pip install --editable ".[test]"
 ```
 
-Run the test suite:
+Run the unit test suite with coverage:
 
 ```shell
-pytest
+pytest --ignore=tests/integration --cov=src --cov-report=term-missing
 ```
 
-The tests mock all openSenseMap requests and do not require network access.
+The unit tests call FastAPI in memory and mock all openSenseMap requests. Run
+the integration test suite separately:
+
+```shell
+pytest tests/integration
+```
+
+The integration tests communicate with HiveBox through a real Uvicorn HTTP
+server. A second local HTTP server provides controlled openSenseMap responses,
+so the suite is reproducible and requires neither Internet access nor Docker.
+Both servers use ephemeral loopback ports and are stopped automatically even
+when a test fails.
 
 #### Run the quality checks
 
@@ -278,7 +289,8 @@ python -m mypy
 python -m build
 python -m twine check dist/*
 python -m pip check
-python -m pytest --cov=src --cov-report=term-missing
+python -m pytest --ignore=tests/integration --cov=src --cov-report=term-missing
+python -m pytest tests/integration
 ```
 
 The test suite must maintain at least 90% coverage. Pylint, Ruff, mypy and the
@@ -292,7 +304,8 @@ The GitHub Actions workflow runs for pull requests and subsequent pushes to
 - Gitflow branch direction and Conventional Commits pull request titles
 - GitHub Actions syntax
 - Python linting, formatting, strict static typing and package integrity
-- unit tests and the coverage threshold
+- unit tests, the coverage threshold and deterministic integration tests over
+  HTTP
 - Dockerfile linting, image building, non-root metadata and a live `/version`
   smoke test with graceful shutdown
 
