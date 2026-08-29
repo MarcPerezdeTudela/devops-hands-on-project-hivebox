@@ -323,6 +323,79 @@ container
 The workflow has read-only repository permissions. External GitHub Actions and
 containerized linters are pinned to immutable commits or image digests.
 
+#### Application security and quality analysis
+
+[SonarQube Cloud](https://sonarcloud.io/project/overview?id=MarcPerezdeTudela_devops-hands-on-project-hivebox)
+analyzes HiveBox for security, reliability and maintainability issues. The
+project uses CI-based analysis on SonarQube Cloud's OSS plan because Gitflow
+pull requests normally target `develop`; the plan must therefore support
+analysis of multiple branches and pull requests. This hosted setup avoids
+maintaining a reachable SonarQube Server and a trusted self-hosted runner.
+
+The dedicated workflow runs for pull requests and subsequent pushes to both
+`develop` and `main`. Push analysis keeps the protected target branches current
+so pull-request findings are calculated against the correct baseline. The
+workflow reruns the unit tests to generate `coverage.xml`, then the official
+scanner waits for the SonarQube Quality Gate. A failed gate makes the clearly
+named `sonarqube-quality-gate` job fail.
+
+The scanner is sufficient for SonarQube Cloud: setting
+`sonar.qualitygate.wait=true` enforces the gate in the same job, while the
+GitHub integration also decorates the pull request. A separate Quality Gate
+Action would duplicate that polling step. Static-analysis scope and coverage
+are configured in `sonar-project.properties`; account identifiers are kept in
+GitHub repository variables.
+
+The main-code scope is intentionally limited to the Python application in
+`src`, with `tests` classified separately as test code. Workflow syntax and
+supply-chain practices already have actionlint and OpenSSF Scorecard checks;
+container and dependency security receive their own phase 4 controls. Keeping
+those responsibilities separate avoids duplicate findings with different
+lifecycles.
+
+Provision the integration before running the workflow:
+
+1. Import this public GitHub repository into a SonarQube Cloud organization
+   using the OSS plan and select CI-based analysis.
+2. Keep the built-in `Sonar way` quality gate initially and disable automatic
+   analysis to prevent duplicate results.
+3. Before its first analysis, set the project's long-lived branch pattern to
+   `develop`. SonarQube always treats `main` as long-lived; this additional
+   pattern models Gitflow's permanent integration branch.
+4. Add `SONAR_ORGANIZATION` and `SONAR_PROJECT_KEY` as GitHub Actions repository
+   variables using the values shown by SonarQube Cloud.
+5. Generate a SonarQube analysis token and add it as the GitHub Actions secret
+   `SONAR_TOKEN`. Never store or print the token in the repository.
+6. Run the workflow for `develop` and `main` to establish their baselines, then
+   verify the analysis on a pull request.
+
+The GitHub CLI can configure the repository values without putting the token in
+shell history. The final command prompts for the secret value:
+
+```shell
+gh variable set SONAR_ORGANIZATION --body "marcperezdetudela"
+gh variable set SONAR_PROJECT_KEY \
+  --body "MarcPerezdeTudela_devops-hands-on-project-hivebox"
+gh secret set SONAR_TOKEN
+```
+
+When the Quality Gate fails, open the linked SonarQube analysis and inspect the
+failed conditions and their new-code findings. Fix actionable findings in the
+same pull request and rerun the workflow. Mark an issue as accepted or false
+positive only after verifying that it does not represent a real risk, and
+record a concise justification in SonarQube so the decision remains auditable.
+Security hotspots require explicit review even when no code change is needed.
+
+GitHub withholds repository secrets from workflows created by external forks.
+The workflow deliberately avoids `pull_request_target`, which would expose the
+analysis token while running untrusted code. A maintainer must copy a reviewed
+external contribution to a branch in this repository before its required
+SonarQube check can pass.
+
+After the initial analyses succeed, issue #30 can make
+`sonarqube-quality-gate` a required check on protected branches. That ruleset
+change is intentionally separate from this integration.
+
 #### Supply-chain security analysis
 
 OpenSSF Scorecard evaluates the repository's software supply-chain security
