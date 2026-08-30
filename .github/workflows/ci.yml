@@ -39,6 +39,9 @@ jobs:
       - name: Test Gitflow policy decisions
         run: bash .github/tests/gitflow-policy-test.sh
 
+      - name: Test temporary branch cleanup decisions
+        run: bash .github/tests/branch-cleanup-test.sh
+
       - name: Validate canonical Gitflow lifecycle
         env:
           BASE_REF: ${{ github.base_ref }}
