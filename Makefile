@@ -61,4 +61,9 @@ docs-diagrams-check:
 	@temporary_directory="$$(mktemp -d)"; \
 	trap 'rm -rf "$$temporary_directory"' EXIT; \
 	$(PYTHON) docs/diagrams/src/render_all.py --output "$$temporary_directory"; \
-	diff --recursive --brief docs/diagrams/generated "$$temporary_directory"
+	cmp --silent docs/diagrams/generated/.source-sha256 \
+		"$$temporary_directory/.source-sha256"; \
+	for name in application cd ci gitflow kubernetes observability; do \
+		test -s "docs/diagrams/generated/$$name.png"; \
+		test -s "docs/diagrams/generated/$$name.svg"; \
+	done

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import importlib
 from pathlib import Path
 import re
@@ -34,6 +35,15 @@ def embed_svg_images(output: Path) -> None:
         svg.write_bytes(IMAGE_REFERENCE.sub(replace, source))
 
 
+def source_digest() -> str:
+    """Return a stable digest for every source that defines generated assets."""
+    digest = hashlib.sha256()
+    source_directory = Path(__file__).parent
+    for name in (*DIAGRAMS, Path(__file__).stem):
+        digest.update((source_directory / f"{name}.py").read_bytes())
+    return digest.hexdigest()
+
+
 def main() -> None:
     """Render SVG and PNG assets into the requested directory."""
     parser = argparse.ArgumentParser()
@@ -46,6 +56,7 @@ def main() -> None:
         module.render(str(arguments.output / name), ["svg", "png"])
 
     embed_svg_images(arguments.output)
+    (arguments.output / ".source-sha256").write_text(f"{source_digest()}\n")
 
 
 if __name__ == "__main__":
