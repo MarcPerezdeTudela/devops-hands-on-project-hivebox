@@ -37,6 +37,7 @@ Here is a pre-start checklist:
 
 - [Create GitHub account](https://docs.github.com/en/get-started/start-your-journey/creating-an-account-on-github) (if you don't have one), then [fork this repository](https://github.com/DevOpsHiveHQ/devops-hands-on-project-hivebox/fork) and start from there.
 - [Create GitHub project board](https://docs.github.com/en/issues/planning-and-tracking-with-projects/creating-projects/creating-a-project) for this repository (use `Kanban` template).
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening an issue or pull request.
 - Follow the canonical Gitflow procedure below. Permanent branches accept only
   pull requests merged with merge commits; never push directly to them.
 - Document as you go. Always assume that someone else will read your project at any phase.
