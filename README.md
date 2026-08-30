@@ -133,6 +133,14 @@ git tag -a vVERSION -m "HiveBox vVERSION"
 git push origin vVERSION
 ```
 
+Pushing the `vVERSION` tag starts the continuous-delivery workflow. Before it
+can publish, the workflow checks that the tag exactly matches the version in
+`pyproject.toml` and that the tag points to the current `main` commit. It then
+publishes the immutable versioned image
+`ghcr.io/MarcPerezdeTudela/devops-hands-on-project-hivebox:vVERSION` to GitHub
+Container Registry. The workflow summary and logs record the resulting image
+digest. Pull requests and ordinary branch pushes never publish release images.
+
 The cleanup workflow deletes both remote temporary branches only after the
 backmerge completes.
 
