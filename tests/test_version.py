@@ -12,4 +12,4 @@ async def test_get_version(api_client: httpx.AsyncClient) -> None:
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
-    assert response.json() == {"version": "0.1.0"}
+    assert response.json() == {"version": "0.2.0"}
