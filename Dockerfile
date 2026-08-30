@@ -23,7 +23,8 @@ ENV PATH="/opt/venv/bin:$PATH" \
 
 WORKDIR /app
 
-RUN groupadd --gid 10001 hivebox \
+RUN /usr/local/bin/python -m pip uninstall --yes pip \
+    && groupadd --gid 10001 hivebox \
     && useradd --uid 10001 --gid hivebox --no-create-home \
         --home-dir /nonexistent --shell /usr/sbin/nologin hivebox
 
