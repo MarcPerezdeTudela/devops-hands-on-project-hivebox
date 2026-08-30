@@ -18,7 +18,7 @@ a public issue. Use [private vulnerability reporting](SECURITY.md) instead.
 
 ## Opening a pull request
 
-Follow the [canonical Gitflow workflow](docs/gitflow.md). Features
+Follow the [canonical Gitflow workflow](README.md#canonical-gitflow). Features
 and ordinary bug fixes start from `develop` and target `develop`; do not push
 directly to permanent branches.
 

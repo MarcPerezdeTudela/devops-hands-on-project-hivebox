@@ -29,9 +29,6 @@ quality = [
     "ruff==0.16.4",
     "twine==7.0.0",
 ]
-docs = [
-    "diagrams==0.25.1",
-]
 
 [tool.fastapi]
 entrypoint = "src.main:app"
@@ -95,16 +92,16 @@ search = '{{"version": "{current_version}"}}'
 replace = '{{"version": "{new_version}"}}'
 
 [[tool.bumpversion.files]]
-filename = "docs/application.md"
+filename = "README.md"
 search = '{{"version":"{current_version}"}}'
 replace = '{{"version":"{new_version}"}}'
 
 [[tool.bumpversion.files]]
-filename = "docs/application.md"
+filename = "README.md"
 search = "hivebox:v{current_version}"
 replace = "hivebox:v{new_version}"
 
 [[tool.bumpversion.files]]
-filename = "docs/kubernetes.md"
-search = "hivebox:v{current_version}"
-replace = "hivebox:v{new_version}"
+filename = "README.md"
+search = "  | grep --fixed-strings 'v{current_version}'"
+replace = "  | grep --fixed-strings 'v{new_version}'"

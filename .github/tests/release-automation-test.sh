@@ -17,13 +17,10 @@ create_fixture() {
   local directory="${TEMPORARY_ROOT}/${name}"
 
   mkdir -p "${directory}/.github/scripts" "${directory}/kubernetes/app" \
-    "${directory}/tests/integration" "${directory}/docs"
+    "${directory}/tests/integration"
   cp "${REPOSITORY_ROOT}/Makefile" "${directory}/"
   cp "${REPOSITORY_ROOT}/pyproject.toml" "${directory}/"
   cp "${REPOSITORY_ROOT}/README.md" "${directory}/"
-  cp "${REPOSITORY_ROOT}/docs/application.md" "${directory}/docs/"
-  cp "${REPOSITORY_ROOT}/docs/gitflow.md" "${directory}/docs/"
-  cp "${REPOSITORY_ROOT}/docs/kubernetes.md" "${directory}/docs/"
   cp "${REPOSITORY_ROOT}/kubernetes/app/deployment.yaml" \
     "${directory}/kubernetes/app/"
   cp "${REPOSITORY_ROOT}/tests/test_version.py" "${directory}/tests/"
@@ -126,15 +123,14 @@ for part in patch minor major; do
     kubernetes/app/deployment.yaml \
     tests/test_version.py \
     tests/integration/test_api.py \
-    docs/application.md \
-    docs/kubernetes.md; do
+    README.md; do
     grep --fixed-strings "${version}" "${directory}/${file}" >/dev/null \
       || fail "${part} bump did not update ${file}"
   done
   [[ "$(git -C "${directory}" tag --points-at "${initial_head}")" == "${initial_tags}" ]] \
     || fail "${part} bump created a tag"
   grep --fixed-strings 'Release `v0.1.0` was independently squash-merged' \
-    "${directory}/docs/gitflow.md" >/dev/null \
+    "${directory}/README.md" >/dev/null \
     || fail "${part} bump changed historical release documentation"
 done
 
