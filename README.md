@@ -298,30 +298,47 @@ packaging tools are configured in `pyproject.toml`.
 
 #### Continuous integration
 
-The GitHub Actions workflow runs for pull requests and subsequent pushes to
-`develop` and `main`. Its independent checks enforce:
+The continuous integration and SonarQube Cloud workflows run for pull requests
+and subsequent pushes to `develop` and `main`. Independent jobs start in
+parallel and declare no artificial `needs` dependencies. Sequential steps
+remain together only when a later step consumes an earlier step's output, such
+as scanning and exercising a newly built container image. The checks enforce:
 
 - Gitflow branch direction and Conventional Commits pull request titles
 - GitHub Actions syntax
 - Python linting, formatting, strict static typing and package integrity
-- unit tests, the coverage threshold and deterministic integration tests over
-  HTTP
+- unit tests and the coverage threshold
+- deterministic integration tests over HTTP
+- Kubernetes manifest security scanning
 - Dockerfile linting, image building, non-root metadata and a live `/version`
-  smoke test with graceful shutdown
+  smoke test with graceful shutdown, plus container vulnerability scanning
+- the SonarQube Cloud Quality Gate
 
-Configure the repository rulesets for `develop` and `main` to require the
-following status checks before merging:
+The stable Phase 4 status-check names are:
 
 ```text
 pull-request-policy
 workflow-lint
 python-quality
 unit-tests
+integration-tests
+kubernetes-security
 container
+sonarqube-quality-gate
 ```
 
-The workflow has read-only repository permissions. External GitHub Actions and
-containerized linters are pinned to immutable commits or image digests.
+The existing ruleset for `develop` and `main` requires the original
+`pull-request-policy`, `workflow-lint`, `python-quality`, `unit-tests`, and
+`container` checks. Issue #30 adds the stable Phase 4 checks after they have run
+successfully, binds them to their expected GitHub Apps, and requires pull
+request branches to be up to date before merging.
+
+The CI workflow denies permissions by default. Only jobs that check out source
+code receive `contents: read`; the pull request policy job uses event context
+without repository access. Every job has a timeout, and concurrency groups
+cancel obsolete runs for the same pull request or branch. External GitHub
+Actions and containerized linters are pinned to immutable commits or image
+digests.
 
 #### Application security and quality analysis
 
