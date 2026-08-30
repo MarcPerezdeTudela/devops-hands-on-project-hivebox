@@ -22,6 +22,7 @@ test = [
     "pytest-httpx==0.36.2",
 ]
 quality = [
+    "bump-my-version==1.5.1",
     "build==1.5.0",
     "mypy==2.3.1",
     "pylint==4.0.7",
@@ -59,3 +60,48 @@ py-version = "3.13"
 [tool.ruff]
 line-length = 88
 target-version = "py313"
+
+[tool.bumpversion]
+allow_dirty = false
+commit = false
+tag = false
+push_tag = false
+parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)\\.(?P<patch>\\d+)"
+serialize = ["{major}.{minor}.{patch}"]
+search = "{current_version}"
+replace = "{new_version}"
+
+[[tool.bumpversion.files]]
+filename = "pyproject.toml"
+search = 'version = "{current_version}"'
+replace = 'version = "{new_version}"'
+
+[[tool.bumpversion.files]]
+filename = "kubernetes/app/deployment.yaml"
+search = "image: hivebox:v{current_version}"
+replace = "image: hivebox:v{new_version}"
+
+[[tool.bumpversion.files]]
+filename = "tests/test_version.py"
+search = '{{"version": "{current_version}"}}'
+replace = '{{"version": "{new_version}"}}'
+
+[[tool.bumpversion.files]]
+filename = "tests/integration/test_api.py"
+search = '{{"version": "{current_version}"}}'
+replace = '{{"version": "{new_version}"}}'
+
+[[tool.bumpversion.files]]
+filename = "README.md"
+search = '{{"version":"{current_version}"}}'
+replace = '{{"version":"{new_version}"}}'
+
+[[tool.bumpversion.files]]
+filename = "README.md"
+search = "hivebox:v{current_version}"
+replace = "hivebox:v{new_version}"
+
+[[tool.bumpversion.files]]
+filename = "README.md"
+search = "  | grep --fixed-strings 'v{current_version}'"
+replace = "  | grep --fixed-strings 'v{new_version}'"

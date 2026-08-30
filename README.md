@@ -141,6 +141,51 @@ publishes the immutable versioned image
 Container Registry. The workflow summary and logs record the resulting image
 digest. Pull requests and ordinary branch pushes never publish release images.
 
+#### Controlled release preparation
+
+Install the local release tools once before preparing a release or hotfix:
+
+```shell
+python -m pip install --editable ".[quality,test]"
+```
+
+After `git flow release start VERSION` or `git flow hotfix start VERSION`, use
+the Make target that matches the intended semantic-version increment. The
+target calculates the next version, verifies that the working tree is clean,
+and requires the current `release/VERSION` or `hotfix/VERSION` branch to match
+that calculated version.
+
+```shell
+make release-bump-patch
+# or: make release-bump-minor
+# or: make release-bump-major
+make release-check
+git diff --check
+git diff
+```
+
+For an ordinary release, `make release-plan` derives the next version from the
+Conventional Commit subjects since the latest reachable `vX.Y.Z` tag: `fix:`
+and `perf:` produce a patch release, `feat:` produces a minor release, and a
+`!` marker or `BREAKING CHANGE:` footer produces a major release. Use
+`make release-prepare` from a clean `develop` branch to calculate that version,
+start the local Gitflow release branch, apply the bump, and run `release-check`
+in one command. It stops before any commit, push, pull request, merge, tag, or
+GitHub Release.
+
+Until the one-time `v0.1.0` history reconciliation described below is completed,
+the calculation uses its documented backmerge on `develop` as the release
+baseline. The reconciliation merge itself remains an explicit manual Gitflow
+step; `make release-prepare` never creates it.
+
+The bump updates the authoritative project version, the local Kubernetes image
+reference, version-contract tests, and active README examples. It does not
+commit, tag, push, open a pull request, merge a branch, or create a GitHub
+Release. Review the diff and commit the version change explicitly before
+continuing with the existing Gitflow pull-request, merge, backmerge, and manual
+tagging sequence above. `release-check` refreshes the editable installation so
+the version-endpoint tests exercise the bumped package metadata.
+
 The cleanup workflow deletes both remote temporary branches only after the
 backmerge completes.
 
