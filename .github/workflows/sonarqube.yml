@@ -1,0 +1,83 @@
+name: SonarQube Cloud analysis
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+      - "release/**"
+  push:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: sonarqube-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  sonarqube-quality-gate:
+    name: sonarqube-quality-gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate SonarQube Cloud configuration
+        env:
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          missing=()
+          [[ -n "${SONAR_ORGANIZATION}" ]] || missing+=(SONAR_ORGANIZATION)
+          [[ -n "${SONAR_PROJECT_KEY}" ]] || missing+=(SONAR_PROJECT_KEY)
+          [[ -n "${SONAR_TOKEN}" ]] || missing+=(SONAR_TOKEN)
+
+          if (( ${#missing[@]} > 0 )); then
+            printf '::error::Missing SonarQube Cloud configuration: %s\n' \
+              "$(IFS=', '; echo "${missing[*]}")"
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13.15"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install the application and test tools
+        run: python -m pip install --disable-pip-version-check ".[test]"
+
+      - name: Generate unit-test coverage
+        run: >-
+          python -m pytest
+          --ignore=tests/integration
+          --cov=src
+          --cov-report=term-missing
+          --cov-report=xml:coverage.xml
+
+      - name: Analyze and enforce the SonarQube Quality Gate
+        uses: SonarSource/sonarqube-scan-action@22918119ff8e1ca75a623e15c8296b6ea4fbe28f # v8.2.1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >-
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.qualitygate.timeout=300

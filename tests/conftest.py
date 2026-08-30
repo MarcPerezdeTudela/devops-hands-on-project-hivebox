@@ -1,11 +1,16 @@
 """Shared pytest fixtures for HiveBox API tests."""
 
+import os
 from collections.abc import AsyncIterator
 
 import httpx
 import pytest
 
-from src.main import app
+# Unit tests always exercise the documented local defaults. This must happen
+# before importing the application because configuration is resolved at import.
+os.environ.pop("HIVEBOX_SENSEBOX_IDS", None)
+
+from src.main import app  # pylint: disable=wrong-import-position
 
 
 @pytest.fixture

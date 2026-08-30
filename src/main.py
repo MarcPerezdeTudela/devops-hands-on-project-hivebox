@@ -3,6 +3,7 @@
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, status
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
 from src import __version__
@@ -12,6 +13,7 @@ from src.opensensemap import (
     OpenSenseMapError,
     get_average_temperature,
 )
+from src.temperature import TemperatureStatus, classify_temperature
 
 
 class VersionResponse(BaseModel):
@@ -21,13 +23,15 @@ class VersionResponse(BaseModel):
 
 
 class TemperatureResponse(BaseModel):
-    """Current average temperature across configured senseBoxes."""
+    """Current average temperature and its comfort classification."""
 
     average_temperature: float
     unit: Literal["°C"] = "°C"
+    status: TemperatureStatus
 
 
 app = FastAPI(title="HiveBox", version=__version__)
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
 
 
 @app.get("/version", response_model=VersionResponse)
@@ -38,7 +42,7 @@ def get_version() -> VersionResponse:
 
 @app.get("/temperature", response_model=TemperatureResponse)
 async def get_temperature() -> TemperatureResponse:
-    """Return the current average temperature from openSenseMap."""
+    """Return the current average temperature and comfort classification."""
     try:
         average_temperature = await get_average_temperature(SENSEBOX_IDS)
     except OpenSenseMapError as exc:
@@ -52,4 +56,7 @@ async def get_temperature() -> TemperatureResponse:
             detail="No temperature measurements from the last hour are available",
         ) from exc
 
-    return TemperatureResponse(average_temperature=average_temperature)
+    return TemperatureResponse(
+        average_temperature=average_temperature,
+        status=classify_temperature(average_temperature),
+    )

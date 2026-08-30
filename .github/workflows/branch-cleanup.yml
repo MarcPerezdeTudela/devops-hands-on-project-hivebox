@@ -1,0 +1,43 @@
+name: Temporary branch cleanup
+
+on:
+  pull_request_target:
+    types:
+      - closed
+    branches:
+      - develop
+      - main
+      - "release/**"
+
+permissions: {}
+
+concurrency:
+  group: branch-cleanup-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    name: branch-cleanup
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Check out cleanup code from the protected default branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - name: Delete only fully integrated temporary branches
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          REPOSITORY: ${{ github.repository }}
+        run: bash .github/scripts/branch-cleanup.sh
