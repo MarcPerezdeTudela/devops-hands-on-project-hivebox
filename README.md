@@ -37,12 +37,139 @@ Here is a pre-start checklist:
 
 - [Create GitHub account](https://docs.github.com/en/get-started/start-your-journey/creating-an-account-on-github) (if you don't have one), then [fork this repository](https://github.com/DevOpsHiveHQ/devops-hands-on-project-hivebox/fork) and start from there.
 - [Create GitHub project board](https://docs.github.com/en/issues/planning-and-tracking-with-projects/creating-projects/creating-a-project) for this repository (use `Kanban` template).
-- Feature and bugfix branches target `develop`. Release and hotfix branches
-  target `main` first, then the same branch and exact head commit can target
-  `develop` for the backmerge after the `main` pull request is merged. Don't
-  push directly to either protected branch.
+- Follow the canonical Gitflow procedure below. Permanent branches accept only
+  pull requests merged with merge commits; never push directly to them.
 - Document as you go. Always assume that someone else will read your project at any phase.
 - You can get senseBox IDs by checking the [openSenseMap](https://opensensemap.org/) website. Use 3 senseBox IDs close to each other (you can use the following [5eba5fbad46fb8001b799786](https://opensensemap.org/explore/5eba5fbad46fb8001b799786), [5c21ff8f919bf8001adf2488](https://opensensemap.org/explore/5c21ff8f919bf8001adf2488), and [5ade1acf223bd80019a1011c](https://opensensemap.org/explore/5ade1acf223bd80019a1011c)). Just copy the IDs, you will need them in the next steps.
+
+### Canonical Gitflow
+
+This repository follows the canonical
+[Gitflow workflow](https://www.atlassian.com/git/tutorials/comparing-workflows/gitflow-workflow).
+`main` records production releases and `develop` integrates work for the next
+release. Pull requests use merge commits (`--no-ff`); squash and rebase merges
+are disabled.
+
+Install `git-flow-next` and synchronize the committed configuration after
+cloning:
+
+```shell
+brew install git-flow-next
+git flow config sync
+git flow config status
+```
+
+The CLI creates, publishes, tracks, and removes temporary branches. GitHub
+performs the final merges because `main`, `develop`, and active release branches
+are protected. Do not use `git flow ... finish` to bypass their pull requests.
+
+#### Features and bugfixes
+
+Feature and ordinary bugfix branches start from `develop` and return only to
+`develop`:
+
+```shell
+git switch develop
+git pull --ff-only
+git flow feature start 47-example
+# Commit the implementation.
+git flow feature publish 47-example
+```
+
+Open `feature/47-example -> develop` and merge it with a merge commit. After
+GitHub removes the remote branch, clean up locally:
+
+```shell
+git switch develop
+git pull --ff-only
+git flow feature delete 47-example --no-remote
+```
+
+Use `git flow bugfix start NAME` for a bugfix based on `develop`. During release
+stabilization, explicitly use the active release as its base:
+
+```shell
+git flow bugfix start NAME release/VERSION
+```
+
+#### Releases
+
+Create a release from `develop` and publish it:
+
+```shell
+git switch develop
+git pull --ff-only
+git flow release start VERSION
+# Apply only release fixes, documentation, and version preparation.
+git flow release publish VERSION
+```
+
+Create a conflict-capable backmerge branch from current `develop`. This branch
+keeps the release head immutable after production approval while allowing later
+`develop` changes and conflict resolutions:
+
+```shell
+git switch develop
+git pull --ff-only
+git switch -c backmerge/release/VERSION
+git merge --no-ff release/VERSION \
+  -m "chore(release): prepare VERSION backmerge"
+git push -u origin backmerge/release/VERSION
+```
+
+Open both pull requests before releasing:
+
+1. `release/VERSION -> main`
+2. Draft `backmerge/release/VERSION -> develop`
+
+Merge the `main` pull request first. Tag its merge commit, then rerun and merge
+the `develop` backmerge:
+
+```shell
+git switch main
+git pull --ff-only
+git tag -a vVERSION -m "HiveBox vVERSION"
+git push origin vVERSION
+```
+
+The cleanup workflow deletes both remote temporary branches only after the
+backmerge completes.
+
+#### Hotfixes
+
+Hotfixes are the only work that starts from `main`:
+
+```shell
+git switch main
+git pull --ff-only
+git flow hotfix start VERSION
+# Commit and validate the production fix.
+git flow hotfix publish VERSION
+```
+
+If a release is active, create `backmerge/hotfix/VERSION` from that release;
+otherwise create it from `develop`. Merge `hotfix/VERSION` into the backmerge
+branch and publish it. Open `hotfix/VERSION -> main` plus the backmerge PR to
+the selected target. Merge into `main` first and tag its merge commit. A release
+cannot complete while one of its production hotfixes is still pending.
+
+#### One-time history reconciliation
+
+Release `v0.1.0` was independently squash-merged into `main` and `develop`.
+Before publishing the next release only, join that ancestry without changing
+the release tree:
+
+```shell
+test "$(git rev-parse main)" = "$(git rev-list -n 1 v0.1.0)"
+release_tree=$(git rev-parse 'HEAD^{tree}')
+git merge --no-ff -s ours main \
+  -m "chore(gitflow): reconcile pre-canonical release history"
+test "$(git rev-parse 'HEAD^{tree}')" = "${release_tree}"
+```
+
+Stop if the `main == v0.1.0` precondition fails. A later main-only hotfix must
+be verified as present instead of being discarded by the `ours` strategy. This
+exception is unnecessary after the next release reaches both permanent branches.
 
 <br/>
 <p align="center">
@@ -329,23 +456,27 @@ container
 sonarqube-quality-gate
 ```
 
-The active `protected-branches` ruleset applies to `develop` and `main`. It
-requires all eight stable Phase 4 checks above, and accepts each result only
-from the GitHub Actions App. Pull request branches must be up to date with
-their target branch before merging, so the successful checks cover the exact
-combination of changes that will enter the protected branch.
+The `main-protection`, `develop-protection`, and `release-protection` rulesets
+require the eight stable Phase 4 checks above and accept each result only from
+the GitHub Actions App. `develop` and active releases require up-to-date pull
+requests. `main` uses loose required checks because canonical Gitflow does not
+make a previous release's main merge commit an ancestor of the next release
+cut from `develop`.
 
-The ruleset preserves the solo-maintainer Gitflow: changes enter through pull
-requests, only squash merges are allowed, and no approving review is mandatory.
-Direct deletion, non-fast-forward updates and merge commits remain blocked,
-with no bypass actor configured.
+All protected integrations use merge commits, require pull requests, block
+non-fast-forward updates, and have no bypass actor. `main` and `develop` also
+block deletion. Release refs remain deletable only so the trusted lifecycle
+cleanup can remove them after their final integration.
 
-For a `release/*` or `hotfix/*` backmerge to `develop`, the
-`pull-request-policy` check queries merged pull requests using read-only API
-access. It requires an earlier pull request from the same repository branch and
-exact head commit to `main`. A reused branch name or commits added after the
-`main` merge cannot authorize a backmerge; those changes must pass through
-`main` first.
+The `pull-request-policy` check uses read-only API access to validate canonical
+branch direction, active-release routing, approved-head ancestry, and companion
+backmerge PRs. A previous production integration must complete its second merge
+before another release or hotfix can enter `main`.
+
+Repository-wide automatic branch deletion is disabled. The separate cleanup
+workflow runs trusted code from the protected default branch and deletes only
+same-repository temporary refs whose current SHA still matches the fully merged
+lifecycle.
 
 The separate `release-tags` ruleset applies to tags matching `v*`. It prevents
 an existing release tag from being deleted or force-updated and has no bypass

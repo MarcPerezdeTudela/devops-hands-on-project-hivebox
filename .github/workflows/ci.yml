@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - main
+      - "release/**"
   push:
     branches:
       - develop
@@ -27,108 +28,28 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
+      contents: read
       pull-requests: read
     steps:
-      - name: Validate Gitflow branch direction and backmerge order
+      - name: Check out the policy implementation
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test Gitflow policy decisions
+        run: bash .github/tests/gitflow-policy-test.sh
+
+      - name: Test temporary branch cleanup decisions
+        run: bash .github/tests/branch-cleanup-test.sh
+
+      - name: Validate canonical Gitflow lifecycle
         env:
           BASE_REF: ${{ github.base_ref }}
           GH_TOKEN: ${{ github.token }}
-          HEAD_LABEL: ${{ github.event.pull_request.head.label }}
           HEAD_REF: ${{ github.head_ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           REPOSITORY: ${{ github.repository }}
-        run: |
-          validate_gitflow() {
-            local base_ref="$1"
-            local head_ref="$2"
-            local head_sha="$3"
-            local merged_main_heads="${4-}"
-
-            case "${base_ref}:${head_ref}" in
-              develop:feature/* | develop:bugfix/* | main:release/* | main:hotfix/*)
-                return 0
-                ;;
-              develop:release/* | develop:hotfix/*)
-                if [[ -n "${head_sha}" ]] \
-                  && grep --fixed-strings --line-regexp --quiet -- \
-                    "${head_sha}" <<< "${merged_main_heads}"; then
-                  return 0
-                fi
-                return 2
-                ;;
-              *)
-                return 1
-                ;;
-            esac
-          }
-
-          expect_policy() {
-            local expected_status="$1"
-            shift
-            local actual_status
-
-            if validate_gitflow "$@"; then
-              actual_status=0
-            else
-              actual_status=$?
-            fi
-
-            if [[ "${actual_status}" != "${expected_status}" ]]; then
-              echo "::error::Gitflow policy self-test failed for '$*':" \
-                "expected ${expected_status}, got ${actual_status}."
-              exit 1
-            fi
-          }
-
-          test_sha="1111111111111111111111111111111111111111"
-          other_sha="2222222222222222222222222222222222222222"
-          expect_policy 0 develop feature/example "${test_sha}" ""
-          expect_policy 0 develop bugfix/example "${test_sha}" ""
-          expect_policy 0 main release/1.0.0 "${test_sha}" ""
-          expect_policy 0 main hotfix/1.0.1 "${test_sha}" ""
-          expect_policy 0 develop release/1.0.0 "${test_sha}" \
-            "${other_sha}"$'\n'"${test_sha}"
-          expect_policy 0 develop hotfix/1.0.1 "${test_sha}" "${test_sha}"
-          expect_policy 2 develop release/1.0.0 "${test_sha}" ""
-          expect_policy 2 develop hotfix/1.0.1 "${test_sha}" "${other_sha}"
-          expect_policy 1 main feature/example "${test_sha}" ""
-
-          merged_main_heads=""
-          case "${BASE_REF}:${HEAD_REF}" in
-            develop:release/* | develop:hotfix/*)
-              merged_main_heads=$(gh api --paginate --method GET \
-                --header "Accept: application/vnd.github+json" \
-                --header "X-GitHub-Api-Version: 2026-03-10" \
-                "repos/${REPOSITORY}/pulls" \
-                --field state=closed \
-                --field base=main \
-                --field "head=${HEAD_LABEL}" \
-                --field per_page=100 \
-                --jq '.[] | select(.merged_at != null) | .head.sha')
-              ;;
-          esac
-
-          if validate_gitflow \
-            "${BASE_REF}" "${HEAD_REF}" "${HEAD_SHA}" "${merged_main_heads}"; then
-            echo "Gitflow allows ${HEAD_REF} to target ${BASE_REF}."
-            exit 0
-          else
-            policy_status=$?
-          fi
-
-          case "${policy_status}" in
-            1)
-              echo "::error::Gitflow does not allow ${HEAD_REF} to target ${BASE_REF}."
-              ;;
-            2)
-              echo "::error::Gitflow requires ${HEAD_REF} at ${HEAD_SHA} to be" \
-                "merged into main before it can target develop."
-              ;;
-            *)
-              echo "::error::Unexpected Gitflow policy status ${policy_status}."
-              ;;
-          esac
-          exit 1
+        run: bash .github/scripts/gitflow-policy.sh
 
       - name: Validate Conventional Commits pull request title
         env:
