@@ -37,9 +37,10 @@ Here is a pre-start checklist:
 
 - [Create GitHub account](https://docs.github.com/en/get-started/start-your-journey/creating-an-account-on-github) (if you don't have one), then [fork this repository](https://github.com/DevOpsHiveHQ/devops-hands-on-project-hivebox/fork) and start from there.
 - [Create GitHub project board](https://docs.github.com/en/issues/planning-and-tracking-with-projects/creating-projects/creating-a-project) for this repository (use `Kanban` template).
-- Feature and bugfix branches target `develop`. Only `release/*` and
-  `hotfix/*` branches target `main`, following Gitflow. Don't push directly to
-  either protected branch.
+- Feature and bugfix branches target `develop`. Release and hotfix branches
+  target `main` first, then the same branch and exact head commit can target
+  `develop` for the backmerge after the `main` pull request is merged. Don't
+  push directly to either protected branch.
 - Document as you go. Always assume that someone else will read your project at any phase.
 - You can get senseBox IDs by checking the [openSenseMap](https://opensensemap.org/) website. Use 3 senseBox IDs close to each other (you can use the following [5eba5fbad46fb8001b799786](https://opensensemap.org/explore/5eba5fbad46fb8001b799786), [5c21ff8f919bf8001adf2488](https://opensensemap.org/explore/5c21ff8f919bf8001adf2488), and [5ade1acf223bd80019a1011c](https://opensensemap.org/explore/5ade1acf223bd80019a1011c)). Just copy the IDs, you will need them in the next steps.
 
@@ -304,7 +305,8 @@ parallel and declare no artificial `needs` dependencies. Sequential steps
 remain together only when a later step consumes an earlier step's output, such
 as scanning and exercising a newly built container image. The checks enforce:
 
-- Gitflow branch direction and Conventional Commits pull request titles
+- Gitflow branch direction, release backmerge ordering and Conventional Commits
+  pull request titles
 - GitHub Actions syntax
 - Python linting, formatting, strict static typing and package integrity
 - unit tests and the coverage threshold
@@ -337,6 +339,13 @@ The ruleset preserves the solo-maintainer Gitflow: changes enter through pull
 requests, only squash merges are allowed, and no approving review is mandatory.
 Direct deletion, non-fast-forward updates and merge commits remain blocked,
 with no bypass actor configured.
+
+For a `release/*` or `hotfix/*` backmerge to `develop`, the
+`pull-request-policy` check queries merged pull requests using read-only API
+access. It requires an earlier pull request from the same repository branch and
+exact head commit to `main`. A reused branch name or commits added after the
+`main` merge cannot authorize a backmerge; those changes must pass through
+`main` first.
 
 The separate `release-tags` ruleset applies to tags matching `v*`. It prevents
 an existing release tag from being deleted or force-updated and has no bypass
