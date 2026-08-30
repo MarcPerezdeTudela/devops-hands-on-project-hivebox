@@ -159,10 +159,37 @@ jobs:
       - name: Run integration tests over HTTP
         run: python -m pytest tests/integration
 
+  kubernetes-security:
+    name: kubernetes-security
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scan Kubernetes manifests for misconfigurations
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # Trivy v0.74.0
+        env:
+          TRIVY_DISABLE_TELEMETRY: "true"
+          TRIVY_K8S_VERSION: "1.36.4"
+          TRIVY_MISCONFIG_SCANNERS: kubernetes
+          TRIVY_SKIP_CHECK_UPDATE: "true"
+          TRIVY_SKIP_VERSION_CHECK: "true"
+        with:
+          cache: true
+          exit-code: "1"
+          hide-progress: true
+          scan-ref: kubernetes
+          scan-type: config
+          severity: UNKNOWN,LOW,MEDIUM,HIGH,CRITICAL
+          version: v0.74.0
+
   container:
     name: container
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       CONTAINER_NAME: hivebox-ci-${{ github.run_id }}-${{ github.run_attempt }}
       IMAGE_NAME: hivebox:ci
@@ -188,6 +215,39 @@ jobs:
 
       - name: Build the container image
         run: docker build --tag "${IMAGE_NAME}" .
+
+      - name: Report container image vulnerabilities
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # Trivy v0.74.0
+        env:
+          TRIVY_DISABLE_TELEMETRY: "true"
+          TRIVY_SKIP_VERSION_CHECK: "true"
+        with:
+          cache: true
+          exit-code: "0"
+          hide-progress: true
+          ignore-unfixed: false
+          image-ref: ${{ env.IMAGE_NAME }}
+          scan-type: image
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          version: v0.74.0
+
+      - name: Fail on fixable container image vulnerabilities
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # Trivy v0.74.0
+        env:
+          TRIVY_DISABLE_TELEMETRY: "true"
+          TRIVY_SKIP_VERSION_CHECK: "true"
+        with:
+          cache: true
+          exit-code: "1"
+          hide-progress: true
+          ignore-unfixed: true
+          image-ref: ${{ env.IMAGE_NAME }}
+          scan-type: image
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          skip-setup-trivy: true
+          version: v0.74.0
 
       - name: Validate container metadata
         run: |
