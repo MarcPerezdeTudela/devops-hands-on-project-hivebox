@@ -100,8 +100,3 @@ replace = '{{"version":"{new_version}"}}'
 filename = "README.md"
 search = "hivebox:v{current_version}"
 replace = "hivebox:v{new_version}"
-
-[[tool.bumpversion.files]]
-filename = "README.md"
-search = "  | grep --fixed-strings 'v{current_version}'"
-replace = "  | grep --fixed-strings 'v{new_version}'"
