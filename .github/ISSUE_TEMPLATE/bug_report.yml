@@ -1,0 +1,62 @@
+name: Bug report
+description: Report reproducible unexpected behavior in HiveBox.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve HiveBox. Do not include credentials,
+        tokens, private keys, or other sensitive data. Report security
+        vulnerabilities through the private channel in the issue chooser.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the unexpected behavior and its impact.
+      placeholder: The endpoint returns...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Provide the smallest reproducible sequence.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Tell us what should have happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Relevant context
+      description: Include versions, environment, logs with sensitive data removed, or other useful details.
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: List the observable conditions that will show this issue is resolved.
+      placeholder: |
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation approach
+      description: Describe the focused tests or checks that should demonstrate the fix.
+    validations:
+      required: true
+  - type: textarea
+    id: security-operations
+    attributes:
+      label: Security or operational considerations
+      description: Note relevant risks, deployment effects, monitoring, or state that none are known.
