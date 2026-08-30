@@ -327,11 +327,32 @@ container
 sonarqube-quality-gate
 ```
 
-The existing ruleset for `develop` and `main` requires the original
-`pull-request-policy`, `workflow-lint`, `python-quality`, `unit-tests`, and
-`container` checks. Issue #30 adds the stable Phase 4 checks after they have run
-successfully, binds them to their expected GitHub Apps, and requires pull
-request branches to be up to date before merging.
+The active `protected-branches` ruleset applies to `develop` and `main`. It
+requires all eight stable Phase 4 checks above, and accepts each result only
+from the GitHub Actions App. Pull request branches must be up to date with
+their target branch before merging, so the successful checks cover the exact
+combination of changes that will enter the protected branch.
+
+The ruleset preserves the solo-maintainer Gitflow: changes enter through pull
+requests, only squash merges are allowed, and no approving review is mandatory.
+Direct deletion, non-fast-forward updates and merge commits remain blocked,
+with no bypass actor configured.
+
+The separate `release-tags` ruleset applies to tags matching `v*`. It prevents
+an existing release tag from being deleted or force-updated and has no bypass
+actor. It deliberately does not restrict tag creation, so an authorized
+maintainer can still create the next release tag after completing the Gitflow
+release process.
+
+Inspect the repository rulesets and then retrieve either complete configuration
+by its reported identifier:
+
+```shell
+gh api repos/MarcPerezdeTudela/devops-hands-on-project-hivebox/rulesets \
+  --jq '.[] | [.id, .name, .target, .enforcement] | @tsv'
+gh api \
+  repos/MarcPerezdeTudela/devops-hands-on-project-hivebox/rulesets/RULESET_ID
+```
 
 The CI workflow denies permissions by default. Only jobs that check out source
 code receive `contents: read`; the pull request policy job uses event context
