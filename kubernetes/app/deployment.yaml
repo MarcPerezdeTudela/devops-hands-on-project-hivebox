@@ -28,7 +28,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: hivebox
-          image: hivebox:v0.1.0
+          image: hivebox:v0.2.0
           imagePullPolicy: Never
           ports:
             - name: http
