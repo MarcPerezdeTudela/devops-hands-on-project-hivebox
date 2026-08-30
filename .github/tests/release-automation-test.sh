@@ -124,12 +124,12 @@ for part in patch minor major; do
     tests/test_version.py \
     tests/integration/test_api.py \
     README.md; do
-    rg --fixed-strings "${version}" "${directory}/${file}" >/dev/null \
+    grep --fixed-strings "${version}" "${directory}/${file}" >/dev/null \
       || fail "${part} bump did not update ${file}"
   done
   [[ "$(git -C "${directory}" tag --points-at "${initial_head}")" == "${initial_tags}" ]] \
     || fail "${part} bump created a tag"
-  rg --fixed-strings 'Release `v0.1.0` was independently squash-merged' \
+  grep --fixed-strings 'Release `v0.1.0` was independently squash-merged' \
     "${directory}/README.md" >/dev/null \
     || fail "${part} bump changed historical release documentation"
 done
