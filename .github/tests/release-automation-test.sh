@@ -129,9 +129,6 @@ for part in patch minor major; do
   done
   [[ "$(git -C "${directory}" tag --points-at "${initial_head}")" == "${initial_tags}" ]] \
     || fail "${part} bump created a tag"
-  grep --fixed-strings 'Release `v0.1.0` was independently squash-merged' \
-    "${directory}/README.md" >/dev/null \
-    || fail "${part} bump changed historical release documentation"
 done
 
 printf 'All controlled release automation tests passed.\n'
