@@ -1,0 +1,84 @@
+name: Continuous delivery
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish-image:
+    name: publish-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out the release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Fetch main
+        run: git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+
+      - name: Validate the release tag
+        id: release
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          version=$(python -c \
+            'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')
+          expected_tag="v${version}"
+
+          if [[ "${RELEASE_TAG}" != "${expected_tag}" ]]; then
+            echo "::error::Release tag '${RELEASE_TAG}' must match '${expected_tag}'."
+            exit 1
+          fi
+
+          tag_commit=$(git rev-list -n 1 "refs/tags/${RELEASE_TAG}")
+          main_commit=$(git rev-parse origin/main)
+          if [[ "${tag_commit}" != "${main_commit}" ]]; then
+            echo "::error::Release tag '${RELEASE_TAG}' must point to the current main HEAD '${main_commit}', got '${tag_commit}'."
+            exit 1
+          fi
+
+          echo "tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish the release image
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ steps.release.outputs.tag }}
+
+      - name: Report published image digest
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}:${{ steps.release.outputs.tag }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          echo "Published ${IMAGE}@${DIGEST}"
+          {
+            echo "## Published HiveBox image"
+            echo
+            echo "- Image: \`${IMAGE}\`"
+            echo "- Digest: \`${DIGEST}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
