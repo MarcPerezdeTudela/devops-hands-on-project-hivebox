@@ -5,6 +5,12 @@ set -euo pipefail
 REPOSITORY_ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 TEMPORARY_ROOT=$(mktemp -d)
 trap 'rm -rf "${TEMPORARY_ROOT}"' EXIT
+CURRENT_VERSION=$(python3 -c \
+  'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')
+IFS=. read -r VERSION_MAJOR VERSION_MINOR VERSION_PATCH <<< "${CURRENT_VERSION}"
+PATCH_VERSION="${VERSION_MAJOR}.${VERSION_MINOR}.$((VERSION_PATCH + 1))"
+MINOR_VERSION="${VERSION_MAJOR}.$((VERSION_MINOR + 1)).0"
+MAJOR_VERSION="$((VERSION_MAJOR + 1)).0.0"
 
 fail() {
   printf 'FAIL: %s\n' "$1" >&2
@@ -36,7 +42,7 @@ create_fixture() {
   git -C "${directory}" config user.name HiveBox
   git -C "${directory}" add .
   git -C "${directory}" commit --quiet --message fixture
-  git -C "${directory}" tag v0.1.0
+  git -C "${directory}" tag "v${CURRENT_VERSION}"
   git -C "${directory}" switch --quiet --create "${branch}"
   printf '%s\n' "${directory}"
 }
@@ -50,18 +56,18 @@ expect_preflight_failure() {
   fi
 }
 
-release_directory=$(create_fixture release release/0.1.1)
-(cd "${release_directory}" && bash .github/scripts/release-preflight.sh 0.1.1)
+release_directory=$(create_fixture release "release/${PATCH_VERSION}")
+(cd "${release_directory}" && bash .github/scripts/release-preflight.sh "${PATCH_VERSION}")
 touch "${release_directory}/untracked"
-expect_preflight_failure "${release_directory}" 0.1.1
+expect_preflight_failure "${release_directory}" "${PATCH_VERSION}"
 rm "${release_directory}/untracked"
-expect_preflight_failure "${release_directory}" 0.1.2
+expect_preflight_failure "${release_directory}" "${MINOR_VERSION}"
 
-hotfix_directory=$(create_fixture hotfix hotfix/0.1.1)
-(cd "${hotfix_directory}" && bash .github/scripts/release-preflight.sh 0.1.1)
+hotfix_directory=$(create_fixture hotfix "hotfix/${PATCH_VERSION}")
+(cd "${hotfix_directory}" && bash .github/scripts/release-preflight.sh "${PATCH_VERSION}")
 
 invalid_directory=$(create_fixture invalid feature/release-check)
-expect_preflight_failure "${invalid_directory}" 0.1.1
+expect_preflight_failure "${invalid_directory}" "${PATCH_VERSION}"
 
 expect_version() {
   local directory="$1"
@@ -84,21 +90,21 @@ expect_no_version() {
 
 patch_directory=$(create_fixture version-patch develop)
 git -C "${patch_directory}" commit --allow-empty --quiet --message 'fix(api): repair endpoint'
-expect_version "${patch_directory}" 0.1.1
+expect_version "${patch_directory}" "${PATCH_VERSION}"
 
 minor_directory=$(create_fixture version-minor develop)
 git -C "${minor_directory}" commit --allow-empty --quiet --message 'fix(api): repair endpoint'
 git -C "${minor_directory}" commit --allow-empty --quiet --message 'feat(api): add endpoint'
-expect_version "${minor_directory}" 0.2.0
+expect_version "${minor_directory}" "${MINOR_VERSION}"
 
 major_directory=$(create_fixture version-major develop)
 git -C "${major_directory}" commit --allow-empty --quiet --message 'feat(api)!: change contract'
-expect_version "${major_directory}" 1.0.0
+expect_version "${major_directory}" "${MAJOR_VERSION}"
 
 breaking_footer_directory=$(create_fixture version-footer develop)
 git -C "${breaking_footer_directory}" commit --allow-empty --quiet \
   --message 'fix(api): change contract' --message 'BREAKING CHANGE: old clients stop working'
-expect_version "${breaking_footer_directory}" 1.0.0
+expect_version "${breaking_footer_directory}" "${MAJOR_VERSION}"
 
 no_release_directory=$(create_fixture version-none develop)
 git -C "${no_release_directory}" commit --allow-empty --quiet --message 'docs(readme): clarify usage'
@@ -106,9 +112,9 @@ expect_no_version "${no_release_directory}"
 
 for part in patch minor major; do
   case "${part}" in
-    patch) version=0.1.1 ;;
-    minor) version=0.2.0 ;;
-    major) version=1.0.0 ;;
+    patch) version=${PATCH_VERSION} ;;
+    minor) version=${MINOR_VERSION} ;;
+    major) version=${MAJOR_VERSION} ;;
   esac
 
   directory=$(create_fixture "bump-${part}" "release/${version}")
