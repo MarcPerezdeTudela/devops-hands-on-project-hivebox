@@ -42,6 +42,7 @@ create_fixture() {
   git -C "${directory}" config user.name HiveBox
   git -C "${directory}" add .
   git -C "${directory}" commit --quiet --message fixture
+  git -C "${directory}" branch --move main
   git -C "${directory}" tag "v${CURRENT_VERSION}"
   git -C "${directory}" switch --quiet --create "${branch}"
   printf '%s\n' "${directory}"
@@ -109,6 +110,18 @@ expect_version "${breaking_footer_directory}" "${MAJOR_VERSION}"
 no_release_directory=$(create_fixture version-none develop)
 git -C "${no_release_directory}" commit --allow-empty --quiet --message 'docs(readme): clarify usage'
 expect_no_version "${no_release_directory}"
+
+hotfix_backmerge_directory=$(create_fixture version-hotfix-backmerge develop)
+git -C "${hotfix_backmerge_directory}" switch --quiet main
+git -C "${hotfix_backmerge_directory}" commit --allow-empty --quiet \
+  --message 'fix(cd): production correction'
+git -C "${hotfix_backmerge_directory}" tag --force "v${CURRENT_VERSION}"
+git -C "${hotfix_backmerge_directory}" switch --quiet develop
+git -C "${hotfix_backmerge_directory}" commit --allow-empty --quiet \
+  --message "chore(release): backmerge hotfix v${CURRENT_VERSION} (#61)"
+git -C "${hotfix_backmerge_directory}" commit --allow-empty --quiet \
+  --message 'fix(api): repair after hotfix'
+expect_version "${hotfix_backmerge_directory}" "${PATCH_VERSION}"
 
 for part in patch minor major; do
   case "${part}" in

@@ -18,8 +18,9 @@ reference=${latest_tag}
 if ! git merge-base --is-ancestor "${latest_tag}" HEAD; then
   main_tag=$(git rev-parse main 2>/dev/null || true)
   tag_commit=$(git rev-list -n 1 "${latest_tag}")
-  backmerge_subject="chore(release): backmerge ${latest_tag}"
-  reference=$(git log --format=%H --fixed-strings --grep="${backmerge_subject}" HEAD \
+  release_tag_pattern=${latest_tag//./\\.}
+  backmerge_subject_pattern="^chore\\(release\\): backmerge( hotfix)? ${release_tag_pattern}( \\(#[0-9]+\\))?$"
+  reference=$(git log --format=%H --extended-regexp --grep="${backmerge_subject_pattern}" HEAD \
     | head -n 1)
 
   if [[ "${main_tag}" != "${tag_commit}" || -z "${reference}" ]]; then
