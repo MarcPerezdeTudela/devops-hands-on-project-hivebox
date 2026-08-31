@@ -19,10 +19,10 @@ source .venv/bin/activate
 python -m pip install --editable .
 fastapi dev
 curl http://127.0.0.1:8000/version
-# {"version":"0.2.1"}
+# {"version":"0.2.2"}
 ```
 
-Build the equivalent local image with `docker build --tag hivebox:v0.2.1 .`.
+Build the equivalent local image with `docker build --tag hivebox:v0.2.2 .`.
 
 ## Project guides
 
