@@ -76,11 +76,12 @@ jobs:
       - name: Publish generated release notes
         env:
           GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.create-tag.outputs.tag }}
         run: |
-          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+          if gh release view "${RELEASE_TAG}" --repo "${REPOSITORY}" >/dev/null 2>&1; then
             echo "Release ${RELEASE_TAG} already exists; retry is a no-op."
             exit 0
           fi
-          gh release create "${RELEASE_TAG}" --generate-notes \
+          gh release create "${RELEASE_TAG}" --repo "${REPOSITORY}" --generate-notes \
             --title "HiveBox ${RELEASE_TAG}"

@@ -79,4 +79,10 @@ expect_failure run_publication "${moved}" 1.2.3 "${merge_sha}" "${main_sha}"
 ! git -C "${moved}" rev-parse --verify --quiet refs/tags/v1.2.3 >/dev/null \
   || fail 'moved main created a tag'
 
+release_workflow=$(<"${REPOSITORY_ROOT}/.github/workflows/release-publication.yml")
+[[ "${release_workflow}" == *'gh release view "${RELEASE_TAG}" --repo "${REPOSITORY}"'* ]] \
+  || fail 'release lookup does not select the repository explicitly'
+[[ "${release_workflow}" == *'gh release create "${RELEASE_TAG}" --repo "${REPOSITORY}"'* ]] \
+  || fail 'release creation does not select the repository explicitly'
+
 printf 'All release publication tests passed.\n'
