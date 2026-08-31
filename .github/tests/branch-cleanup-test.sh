@@ -10,13 +10,20 @@ HEAD_REPOSITORY=owner/repository
 PR_MERGED=true
 HEAD_SHA=head
 
-MOCK_ANCESTORS="source:head head:develop"
+current_ref_sha() { return 1; }
+delete_ref_if_matches feature/already-removed head >/dev/null
+printf 'PASS: already absent ref cleanup is idempotent\n'
+
+MOCK_ANCESTORS="source:head head:develop head:head"
 MOCK_ACTIVE_RELEASES=release/2.0.0
 MOCK_PENDING=0
+MOCK_DELIVERED_TOPIC_REFS=""
+MOCK_MAIN_SHA=head
 DELETED_REFS=""
 
 branch_head() {
   case "$1" in
+    main) printf '%s\n' "${MOCK_MAIN_SHA}" ;;
     develop) printf 'develop\n' ;;
     release/* | hotfix/*) printf 'source\n' ;;
     *) printf 'head\n' ;;
@@ -27,6 +34,7 @@ is_ancestor() { [[ " ${MOCK_ANCESTORS} " == *" $1:$2 "* ]]; }
 pending_hotfix_count() { printf '%s\n' "${MOCK_PENDING}"; }
 incomplete_hotfix_count() { printf '%s\n' "${MOCK_PENDING}"; }
 active_release_names() { printf '%s\n' "${MOCK_ACTIVE_RELEASES}"; }
+delivered_topic_refs() { printf '%s\n' "${MOCK_DELIVERED_TOPIC_REFS}"; }
 delete_ref_if_matches() {
   valid_temporary_ref "$1" || return 1
   DELETED_REFS="${DELETED_REFS} $1@$2"
@@ -36,9 +44,11 @@ reset_mocks() {
   HEAD_REPOSITORY=owner/repository
   PR_MERGED=true
   HEAD_SHA=head
-  MOCK_ANCESTORS="source:head head:develop"
+  MOCK_ANCESTORS="source:head head:develop head:head"
   MOCK_ACTIVE_RELEASES=release/2.0.0
   MOCK_PENDING=0
+  MOCK_DELIVERED_TOPIC_REFS=""
+  MOCK_MAIN_SHA=head
   DELETED_REFS=""
 }
 
@@ -65,7 +75,7 @@ expect_cleanup() {
 
 reset_mocks
 BASE_REF=develop HEAD_REF=feature/example
-expect_cleanup 0 " feature/example@head" "merged feature is deleted"
+expect_cleanup 0 "" "merged feature is retained"
 
 reset_mocks
 BASE_REF=develop HEAD_REF=feature/example PR_MERGED=false
@@ -85,9 +95,21 @@ expect_cleanup 0 "" "release awaiting backmerge is retained"
 
 reset_mocks
 BASE_REF=develop HEAD_REF=backmerge/release/2.0.0
+MOCK_DELIVERED_TOPIC_REFS=$'feature/example\thead\nbugfix/release-fix\thead'
 expect_cleanup 0 \
-  " backmerge/release/2.0.0@head release/2.0.0@source" \
-  "completed release refs are deleted"
+  " backmerge/release/2.0.0@head release/2.0.0@source feature/example@head bugfix/release-fix@head" \
+  "completed release and delivered topic refs are deleted"
+
+reset_mocks
+MOCK_DELIVERED_TOPIC_REFS=$'feature/example\thead'
+MOCK_MAIN_SHA=main
+MOCK_ANCESTORS="source:head"
+cleanup_delivered_topics >/dev/null
+[[ -z "${DELETED_REFS}" ]] || {
+  printf 'FAIL: topic branch not delivered to main was deleted\n' >&2
+  exit 1
+}
+printf 'PASS: topic branch not delivered to main is retained\n'
 
 reset_mocks
 BASE_REF=develop HEAD_REF=backmerge/release/2.0.0 MOCK_PENDING=1

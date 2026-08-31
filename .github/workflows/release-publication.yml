@@ -1,0 +1,86 @@
+name: Release publication
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+permissions: {}
+
+concurrency:
+  group: release-publication-main
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  create-tag:
+    name: create-release-tag
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - name: Check out the merged production commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Create the verified release tag
+        id: release
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          [[ "${HEAD_REF}" == release/* || "${HEAD_REF}" == hotfix/* ]] || {
+            echo "::error::Only release/* and hotfix/* branches may publish a release."
+            exit 1
+          }
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          git fetch --tags origin
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          version=$(python -c \
+            'import pathlib, tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]["version"])')
+          tag=$(RELEASE_VERSION="${version}" MAIN_SHA="$(git rev-parse origin/main)" \
+            bash .github/scripts/release-publication.sh)
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+  publish-image:
+    needs: create-tag
+    uses: ./.github/workflows/cd.yml
+    with:
+      release_tag: ${{ needs.create-tag.outputs.tag }}
+    permissions:
+      contents: read
+      packages: write
+
+  publish-release:
+    name: publish-github-release
+    needs:
+      - create-tag
+      - publish-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Publish generated release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.create-tag.outputs.tag }}
+        run: |
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} already exists; retry is a no-op."
+            exit 0
+          fi
+          gh release create "${RELEASE_TAG}" --generate-notes \
+            --title "HiveBox ${RELEASE_TAG}"

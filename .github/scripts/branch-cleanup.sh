@@ -43,6 +43,43 @@ delete_ref_if_matches() {
     "${branch}" "${expected_sha}"
 }
 
+delivered_topic_refs() {
+  api_closed_pulls \
+    | flatten_pages \
+    | jq -r \
+      --arg repo "${REPOSITORY}" \
+      '[.[]
+        | select(.head.repo.full_name == $repo)
+        | select(.merged_at != null)
+        | select(.base.ref == "develop" or (.base.ref | startswith("release/")))
+        | select(.head.ref | startswith("feature/") or startswith("bugfix/"))]
+       | sort_by(.head.ref, .merged_at)
+       | group_by(.head.ref)
+       | map(last)[]
+       | [.head.ref, .head.sha]
+       | @tsv'
+}
+
+cleanup_delivered_topics() {
+  local main_sha branch approved_sha
+  local rows
+
+  main_sha=$(branch_head main) || policy_error \
+    "Unable to determine whether topic branches reached main." || return 1
+  rows=$(delivered_topic_refs) || policy_error \
+    "Unable to determine merged feature and bugfix branches." || return 1
+
+  while IFS=$'\t' read -r branch approved_sha; do
+    [[ -n "${branch}" ]] || continue
+    if ! is_ancestor "${approved_sha}" "${main_sha}"; then
+      printf '%s at %s has not reached main; retaining the ref.\n' \
+        "${branch}" "${approved_sha}"
+      continue
+    fi
+    delete_ref_if_matches "${branch}" "${approved_sha}" || return 1
+  done <<< "${rows}"
+}
+
 cleanup_release_backmerge() {
   local suffix="${HEAD_REF#backmerge/release/}"
   local source_branch="release/${suffix}"
@@ -65,7 +102,8 @@ cleanup_release_backmerge() {
     "${pending} production hotfix(es) still require a backmerge." || return 1
 
   delete_ref_if_matches "${HEAD_REF}" "${HEAD_SHA}" || return 1
-  delete_ref_if_matches "${source_branch}" "${source_sha}"
+  delete_ref_if_matches "${source_branch}" "${source_sha}" || return 1
+  cleanup_delivered_topics
 }
 
 cleanup_hotfix_backmerge() {
@@ -113,7 +151,7 @@ cleanup_main() {
 
   case "${BASE_REF}:${HEAD_REF}" in
     develop:feature/* | develop:bugfix/* | release/*:bugfix/*)
-      delete_ref_if_matches "${HEAD_REF}" "${HEAD_SHA}"
+      printf '%s is retained until its merged head has reached main.\n' "${HEAD_REF}"
       ;;
     develop:backmerge/release/*)
       cleanup_release_backmerge
@@ -124,7 +162,8 @@ cleanup_main() {
     main:release/*)
       develop_sha=$(branch_head develop) || return 1
       if is_ancestor "${HEAD_SHA}" "${develop_sha}"; then
-        delete_ref_if_matches "${HEAD_REF}" "${HEAD_SHA}"
+        delete_ref_if_matches "${HEAD_REF}" "${HEAD_SHA}" || return 1
+        cleanup_delivered_topics
       else
         printf '%s still requires its develop backmerge; retaining the ref.\n' \
           "${HEAD_REF}"
