@@ -99,6 +99,12 @@ MOCK_ANCESTORS="approved:target-tip"
 expect_status 0 "release with nothing to return needs no companion"
 
 reset_mocks
+BASE_REF=main HEAD_REF=release/1.0.0
+MOCK_COMPANION_SHA=approved
+MOCK_ANCESTORS="approved:approved"
+expect_status 1 "release companion cannot reuse approved head"
+
+reset_mocks
 BASE_REF=main HEAD_REF=release/1.0.0 MOCK_INCOMPLETE=1
 expect_status 1 "incomplete production integration blocks release"
 
