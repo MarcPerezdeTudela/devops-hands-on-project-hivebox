@@ -26,3 +26,13 @@ Use a Conventional Commits title, complete the pull-request template, reference
 the related issue, and report the validation you ran. Update documentation when
 the change affects setup, configuration, behavior, deployment, or workflow.
 Consider security and operational impact before submitting the pull request.
+
+### Pull requests from forks
+
+GitHub withholds the SonarQube token from fork pull requests, so their
+SonarQube Quality Gate cannot pass directly. Do not provide secrets in issue or
+pull-request content. A maintainer reviews the contribution and, when it is
+ready for integration, applies the reviewed commits to a repository-owned
+branch for the required SonarQube analysis. See
+[CI and security](docs/ci-and-security.md#sonarqube-and-pull-requests-from-forks)
+for the security rationale.
