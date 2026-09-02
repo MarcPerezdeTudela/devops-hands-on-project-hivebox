@@ -19,7 +19,7 @@ source .venv/bin/activate
 python -m pip install --editable .
 fastapi dev
 curl http://127.0.0.1:8000/version
-# {"version":"0.2.3"}
+# {"version":"0.3.0"}
 ```
 
 ## Run the container locally
@@ -33,13 +33,13 @@ Validate the Dockerfile and build the image from the repository root:
 
 ```shell
 docker build --check .
-docker build --tag hivebox:v0.2.3 .
+docker build --tag hivebox:v0.3.0 .
 ```
 
 Run the API and publish its port locally:
 
 ```shell
-docker run --rm --name hivebox -p 8000:8000 hivebox:v0.2.3
+docker run --rm --name hivebox -p 8000:8000 hivebox:v0.3.0
 ```
 
 The API documentation is available at `http://127.0.0.1:8000/docs`, and its
@@ -48,7 +48,7 @@ verify the application endpoints:
 
 ```shell
 curl http://127.0.0.1:8000/version
-# {"version":"0.2.3"}
+# {"version":"0.3.0"}
 curl http://127.0.0.1:8000/metrics
 ```
 
