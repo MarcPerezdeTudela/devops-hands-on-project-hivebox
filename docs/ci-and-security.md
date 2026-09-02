@@ -32,12 +32,18 @@ Do not change this workflow to `pull_request_target` or otherwise run
 fork-provided code with `SONAR_TOKEN`. That would grant an untrusted pull
 request access to a credential that can submit analysis for this repository.
 
-For an external contribution, a maintainer should first review the pull request
-and then apply the reviewed commits to a branch in this repository. The trusted
-branch pull request receives the normal SonarQube analysis and can satisfy the
-required quality gate. The original fork pull request remains the review record
-and must not be merged until its equivalent trusted branch has passed the
-required checks.
+For an external contribution, a maintainer should:
+
+1. Review the pull request from the fork without exposing repository secrets.
+2. Apply the reviewed commits to a branch in this repository and open a trusted
+   branch pull request that links to the external contribution.
+3. Validate and merge the trusted branch pull request after its required checks,
+   including the normal SonarQube analysis, pass.
+4. Close the original fork pull request without merging it, link to the trusted
+   pull request, and credit the external author for the contribution.
+
+The external pull request remains the review and attribution record, while the
+trusted branch pull request is the integration vehicle.
 
 If the project later needs self-service fork contributions, separate the
 privileged SonarQube analysis from checks required of fork pull requests. Keep
