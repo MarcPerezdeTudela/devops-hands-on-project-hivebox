@@ -5,8 +5,9 @@
 HiveBox is an incremental DevOps learning project: a FastAPI service retrieves
 recent ambient-temperature data from openSenseMap, exposes it for beekeepers,
 and is delivered through containers, Kubernetes, CI, and Gitflow. Phase 4 is
-the current target. Read [README.md](README.md) for the complete operational
-documentation; this file is concise working guidance, not a duplicate.
+the current target. Read [README.md](README.md) and its linked runbooks for
+the operational documentation; this file is concise working guidance, not a
+duplicate.
 
 Make the smallest correct change for the requested issue. Do not refactor,
 rename, reformat, or update dependencies outside that scope. Reuse existing
@@ -47,8 +48,8 @@ path, locate the closest existing implementation and follow its convention.
 
 ## Git and pull requests
 
-The authoritative workflow is the Canonical Gitflow section of `README.md`
-and `.gitflow`.
+The authoritative workflow is [docs/gitflow.md](docs/gitflow.md) and
+`.gitflow`.
 
 - Branch features and ordinary bug fixes from `develop` using
   `feature/<issue>-<slug>` or `bugfix/<slug>`.
