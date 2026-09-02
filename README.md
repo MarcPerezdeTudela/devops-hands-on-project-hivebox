@@ -22,7 +22,38 @@ curl http://127.0.0.1:8000/version
 # {"version":"0.2.3"}
 ```
 
-Build the equivalent local image with `docker build --tag hivebox:v0.2.3 .`.
+## Run the container locally
+
+The multi-stage build installs the application in an isolated virtual
+environment and copies only that environment into the runtime stage. The final
+container uses the pinned slim Python image and runs as the unprivileged user
+`10001:10001`.
+
+Validate the Dockerfile and build the image from the repository root:
+
+```shell
+docker build --check .
+docker build --tag hivebox:v0.2.3 .
+```
+
+Run the API and publish its port locally:
+
+```shell
+docker run --rm --name hivebox -p 8000:8000 hivebox:v0.2.3
+```
+
+The API documentation is available at `http://127.0.0.1:8000/docs`, and its
+OpenAPI schema at `http://127.0.0.1:8000/openapi.json`. In another terminal,
+verify the application endpoints:
+
+```shell
+curl http://127.0.0.1:8000/version
+# {"version":"0.2.3"}
+curl http://127.0.0.1:8000/metrics
+```
+
+The `/metrics` endpoint returns Prometheus text exposition. Press `Ctrl+C` to
+stop the API; `--rm` removes the stopped container automatically.
 
 ## Project guides
 
