@@ -67,3 +67,10 @@ stop the API; `--rm` removes the stopped container automatically.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidance and
 [SECURITY.md](SECURITY.md) for responsible vulnerability reporting.
+
+## License
+
+The HiveBox implementation in this repository is available under the
+[MIT License](LICENSE). The project requirements are based on the
+[HiveBox hands-on project](https://devopsroadmap.io/projects/hivebox/) from
+DevOps Hive.
