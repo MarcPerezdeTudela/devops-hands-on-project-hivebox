@@ -8,6 +8,18 @@ SonarQube Cloud evaluates code quality and the OpenSSF Scorecard assesses
 repository supply-chain practices. Container and manifest scans complement
 these services with focused security checks.
 
+## Published image vulnerability scans
+
+`published-image-scan.yml` runs every Saturday at 01:45 UTC and can also be
+started manually. It resolves the latest GitHub Release tag, obtains the
+corresponding GHCR image digest, and records both values in the workflow
+summary so findings are tied to an immutable image.
+
+The first Trivy scan reports every HIGH and CRITICAL vulnerability, including
+unfixed findings, without failing the run. A second scan fails when it detects
+a fixable HIGH or CRITICAL vulnerability. Review the first scan's log before
+addressing the failing gate, because it preserves the full finding set.
+
 ## SonarQube and pull requests from forks
 
 GitHub does not provide repository secrets, including `SONAR_TOKEN`, to
