@@ -58,6 +58,9 @@ jobs:
       - name: Test release publication decisions
         run: bash .github/tests/release-publication-test.sh
 
+      - name: Test release image publication decisions
+        run: bash .github/tests/cd-workflow-test.sh
+
       - name: Validate canonical Gitflow lifecycle
         env:
           BASE_REF: ${{ github.base_ref }}
