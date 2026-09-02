@@ -1,0 +1,109 @@
+name: Published image vulnerability scan
+
+on:
+  schedule:
+    - cron: "45 1 * * 6"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: published-image-scan
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  scan:
+    name: scan-published-image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Normalize the container image name
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: echo "name=ghcr.io/${REPOSITORY,,}" >> "${GITHUB_OUTPUT}"
+
+      - name: Resolve the latest release image tag
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          tag=$(gh release view --repo "${REPOSITORY}" --json tagName --jq '.tagName')
+          [[ "${tag}" == v* ]] || {
+            echo "::error::Latest release tag '${tag}' is not a version tag."
+            exit 1
+          }
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve the published image digest
+        id: published-image
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          reference="${IMAGE}:${RELEASE_TAG}"
+          digest=$(docker buildx imagetools inspect "${reference}" --format '{{.Digest}}')
+          [[ "${digest}" == sha256:* ]] || {
+            echo "::error::Unable to determine the digest for '${reference}'."
+            exit 1
+          }
+
+          echo "reference=${reference}" >> "${GITHUB_OUTPUT}"
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+          {
+            echo "## Published HiveBox image scan"
+            echo
+            echo "- Image: \`${reference}\`"
+            echo "- Digest: \`${digest}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Report published image vulnerabilities
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # Trivy v0.74.0
+        env:
+          TRIVY_DISABLE_TELEMETRY: "true"
+          TRIVY_SKIP_VERSION_CHECK: "true"
+        with:
+          cache: true
+          exit-code: "0"
+          hide-progress: true
+          ignore-unfixed: false
+          image-ref: ${{ steps.published-image.outputs.reference }}@${{ steps.published-image.outputs.digest }}
+          scan-type: image
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          version: v0.74.0
+
+      - name: Fail on fixable published image vulnerabilities
+        uses: aquasecurity/trivy-action@d2a0b60797ff03db6132bd4e2b293f9b37081297 # Trivy v0.74.0
+        env:
+          TRIVY_DISABLE_TELEMETRY: "true"
+          TRIVY_SKIP_VERSION_CHECK: "true"
+        with:
+          cache: true
+          exit-code: "1"
+          hide-progress: true
+          ignore-unfixed: true
+          image-ref: ${{ steps.published-image.outputs.reference }}@${{ steps.published-image.outputs.digest }}
+          scan-type: image
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          skip-setup-trivy: true
+          version: v0.74.0

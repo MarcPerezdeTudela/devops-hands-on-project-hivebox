@@ -9,7 +9,7 @@ WORKDIR /app
 
 RUN python -m venv --without-pip "$VIRTUAL_ENV"
 
-COPY pyproject.toml README.md ./
+COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 
 RUN --mount=type=cache,target=/root/.cache/pip \

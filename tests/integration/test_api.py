@@ -12,7 +12,7 @@ def test_version_contract_over_http(live_api_client: httpx.Client) -> None:
 
     assert response.status_code == 200
     assert response.headers["content-type"] == "application/json"
-    assert response.json() == {"version": "0.2.3"}
+    assert response.json() == {"version": "0.3.0"}
 
 
 def test_metrics_contract_over_http(live_api_client: httpx.Client) -> None:

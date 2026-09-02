@@ -7,10 +7,6 @@ policy_error() {
   return 1
 }
 
-repo_owner() {
-  printf '%s\n' "${REPOSITORY%%/*}"
-}
-
 api_open_pulls() {
   gh api --paginate --method GET \
     --header "Accept: application/vnd.github+json" \
@@ -56,26 +52,6 @@ is_ancestor() {
     --jq '.status') || return 1
 
   [[ "${status}" == "ahead" || "${status}" == "identical" ]]
-}
-
-open_pr_head() {
-  local base="$1"
-  local head_branch="$2"
-  local owner
-  owner=$(repo_owner)
-
-  api_open_pulls \
-    | flatten_pages \
-    | jq -r \
-      --arg base "${base}" \
-      --arg head "${head_branch}" \
-      --arg repo "${REPOSITORY}" \
-      '.[]
-       | select(.base.ref == $base)
-       | select(.head.ref == $head)
-       | select(.head.repo.full_name == $repo)
-       | .head.sha' \
-    | head -n 1
 }
 
 merged_main_head() {
@@ -231,22 +207,6 @@ pending_hotfix_count() {
        | length'
 }
 
-require_companion() {
-  local approved_sha="$1"
-  local companion_branch="$2"
-  local companion_target="$3"
-  local companion_sha
-
-  companion_sha=$(open_pr_head "${companion_target}" "${companion_branch}")
-  [[ -n "${companion_sha}" ]] || policy_error \
-    "Open ${companion_branch} -> ${companion_target} before merging into main." \
-    || return 1
-
-  is_ancestor "${approved_sha}" "${companion_sha}" || policy_error \
-    "${companion_branch} does not contain approved head ${approved_sha}." \
-    || return 1
-}
-
 require_no_incomplete_production() {
   local incomplete
   incomplete=$(production_incomplete_count) || return 1
@@ -279,12 +239,6 @@ validate_policy() {
 
     main:release/*)
       require_no_incomplete_production || return 1
-      suffix="${HEAD_REF#release/}"
-      if is_ancestor "${HEAD_SHA}" "$(branch_head develop)"; then
-        return 0
-      fi
-      require_companion \
-        "${HEAD_SHA}" "backmerge/release/${suffix}" develop
       ;;
 
     main:hotfix/*)
@@ -298,14 +252,6 @@ validate_policy() {
         policy_error "Multiple active releases make hotfix routing ambiguous."
         return 1
       fi
-      suffix="${HEAD_REF#hotfix/}"
-      if (( ${#active_releases[@]} == 1 )); then
-        require_companion \
-          "${HEAD_SHA}" "backmerge/hotfix/${suffix}" "${active_releases[0]}"
-      else
-        require_companion \
-          "${HEAD_SHA}" "backmerge/hotfix/${suffix}" develop
-      fi
       ;;
 
     develop:backmerge/release/*)
@@ -314,6 +260,9 @@ validate_policy() {
       approved_sha=$(merged_main_head "${source_branch}")
       [[ -n "${approved_sha}" ]] || policy_error \
         "${source_branch} must merge into main before its develop backmerge." \
+        || return 1
+      [[ "${HEAD_SHA}" != "${approved_sha}" ]] || policy_error \
+        "${HEAD_REF} must use a distinct head from approved release ${approved_sha}." \
         || return 1
       is_ancestor "${approved_sha}" "${HEAD_SHA}" || policy_error \
         "${HEAD_REF} does not contain main-approved head ${approved_sha}." \
@@ -340,6 +289,9 @@ validate_policy() {
       approved_sha=$(merged_main_head "${source_branch}")
       [[ -n "${approved_sha}" ]] || policy_error \
         "${source_branch} must merge into main before its backmerge." \
+        || return 1
+      [[ "${HEAD_SHA}" != "${approved_sha}" ]] || policy_error \
+        "${HEAD_REF} must use a distinct head from approved hotfix ${approved_sha}." \
         || return 1
       is_ancestor "${approved_sha}" "${HEAD_SHA}" || policy_error \
         "${HEAD_REF} does not contain main-approved head ${approved_sha}." \
