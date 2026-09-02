@@ -242,6 +242,10 @@ require_companion() {
     "Open ${companion_branch} -> ${companion_target} before merging into main." \
     || return 1
 
+  [[ "${companion_sha}" != "${approved_sha}" ]] || policy_error \
+    "${companion_branch} must use a distinct head from approved release ${approved_sha}." \
+    || return 1
+
   is_ancestor "${approved_sha}" "${companion_sha}" || policy_error \
     "${companion_branch} does not contain approved head ${approved_sha}." \
     || return 1
