@@ -153,6 +153,29 @@ jobs:
       - name: Validate distribution metadata
         run: python -m twine check dist/*
 
+      - name: Validate wheel license
+        run: |
+          python - <<'PY'
+          from email.parser import Parser
+          from pathlib import Path
+          from zipfile import ZipFile
+
+          wheel = next(Path("dist").glob("*.whl"))
+          with ZipFile(wheel) as archive:
+              metadata_path = next(
+                  name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
+              )
+              metadata = Parser().parsestr(archive.read(metadata_path).decode())
+              assert metadata["License-Expression"] == "MIT"
+
+              license_path = next(
+                  name
+                  for name in archive.namelist()
+                  if name.endswith(".dist-info/licenses/LICENSE")
+              )
+              assert archive.read(license_path).decode() == Path("LICENSE").read_text()
+          PY
+
       - name: Validate the wheel in an isolated environment
         run: |
           python -m venv "${RUNNER_TEMP}/hivebox-wheel-check"
@@ -322,6 +345,20 @@ jobs:
             --format '{{json .Config.ExposedPorts}}' \
             | python -c \
               'import json, sys; assert "8000/tcp" in json.load(sys.stdin)'
+
+      - name: Validate container license
+        run: |
+          docker run --rm --entrypoint python "${IMAGE_NAME}" -c '
+          from importlib.metadata import distribution
+
+          package = distribution("hivebox")
+          license_file = next(
+              file for file in package.files if str(file).endswith(".dist-info/licenses/LICENSE")
+          )
+          license_text = package.locate_file(license_file).read_text()
+          assert "MIT License" in license_text
+          assert "Copyright (c) 2026 Marc Perez de Tudela" in license_text
+          '
 
       - name: Read the expected application version
         id: project
