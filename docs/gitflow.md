@@ -8,6 +8,13 @@ Features and ordinary bug fixes start from `develop`. Releases are stabilized
 on `release/VERSION`, integrated into `main`, and backmerged into `develop`.
 Hotfixes start from `main` and are backmerged to the active release or develop.
 
+## Protected production merges
+
+The `main-protection` ruleset requires all configured status checks to be
+current before a pull request can merge. When `main` advances, GitHub requires
+the pull request branch to update and the required checks to pass again on the
+updated head; checks from an earlier base state cannot satisfy the rule.
+
 ## Temporary branch cleanup
 
 GitHub's repository-wide automatic pull-request branch deletion is disabled.
