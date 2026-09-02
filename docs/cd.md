@@ -10,6 +10,9 @@ checks have allowed the merge. It verifies the exact merge SHA is still the
 `main` tip, creates the annotated `vVERSION` tag, reuses the image-publication
 workflow, and then publishes a GitHub Release with generated notes.
 
+See the [Gitflow lifecycle runbook](gitflow.md#release-lifecycle) for the
+required release, production merge, and backmerge order.
+
 The workflows use only the scoped `GITHUB_TOKEN`; no personal access token is
 needed. They never approve or merge pull requests, create commits, force-push,
 rewrite or delete refs, or recreate branches. A matching existing tag or
