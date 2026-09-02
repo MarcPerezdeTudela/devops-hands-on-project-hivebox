@@ -13,8 +13,11 @@ workflow, and then publishes a GitHub Release with generated notes.
 The workflows use only the scoped `GITHUB_TOKEN`; no personal access token is
 needed. They never approve or merge pull requests, create commits, force-push,
 rewrite or delete refs, or recreate branches. A matching existing tag or
-release makes a retry a no-op. A tag at a different SHA, an invalid version, or
-a merge SHA that is no longer `main` stops the workflow without changing refs.
+GitHub Release makes its corresponding retry a no-op. For image publication,
+the workflow first inspects the versioned GHCR tag: an existing tag is reused
+with its recorded digest, while only an absent tag is built and pushed. A tag
+at a different SHA, an invalid version, or a merge SHA that is no longer
+`main` stops the workflow without changing refs.
 
 For manual recovery, verify the intended `main` SHA and project version first.
 If the annotated tag is absent, create it at that exact SHA and push it; this

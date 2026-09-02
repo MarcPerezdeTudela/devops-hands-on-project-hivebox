@@ -75,18 +75,46 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: echo "name=ghcr.io/${REPOSITORY,,}" >> "${GITHUB_OUTPUT}"
 
+      - name: Check for an existing release image
+        id: existing-image
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if digest=$(docker buildx imagetools inspect \
+            "${IMAGE}:${RELEASE_TAG}" --format '{{.Digest}}' 2>/dev/null); then
+            echo "exists=true" >> "${GITHUB_OUTPUT}"
+            echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "exists=false" >> "${GITHUB_OUTPUT}"
+          fi
+
       - name: Build and publish the release image
         id: build
+        if: steps.existing-image.outputs.exists != 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           push: true
           tags: ${{ steps.image.outputs.name }}:${{ steps.release.outputs.tag }}
 
+      - name: Select the release image digest
+        id: published-image
+        env:
+          EXISTING_DIGEST: ${{ steps.existing-image.outputs.digest }}
+          BUILD_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          digest="${EXISTING_DIGEST:-${BUILD_DIGEST}}"
+          [[ -n "${digest}" ]] || {
+            echo "::error::Unable to determine the release image digest."
+            exit 1
+          }
+          echo "digest=${digest}" >> "${GITHUB_OUTPUT}"
+
       - name: Report published image digest
         env:
           IMAGE: ${{ steps.image.outputs.name }}:${{ steps.release.outputs.tag }}
-          DIGEST: ${{ steps.build.outputs.digest }}
+          DIGEST: ${{ steps.published-image.outputs.digest }}
         run: |
           echo "Published ${IMAGE}@${DIGEST}"
           {
